@@ -19,7 +19,7 @@ authors = [
   {name="InstaDeep" , email = "hello@instadeep.com"},
 ]
 requires-python = ">=3.9"
-version = "0.0.1" # Make sure to follow the official versioning format https://peps.python.org/pep-0440/#version-scheme
+version = "0.0.1" 
 classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Environment :: Console",
