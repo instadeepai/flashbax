@@ -13,7 +13,7 @@ include = ["flashbax/*"]
 
 [project]
 name = "flashbax"
-description = "Flashbax is a experience replay library oriented around JAX. Tailored to integrate seamlessly with JAX's Just-In-Time (JIT) compilation."
+description = "Flashbax is an experience replay library oriented around JAX. Tailored to integrate seamlessly with JAX's Just-In-Time (JIT) compilation."
 readme = "README.md"
 authors = [
   {name="InstaDeep" , email = "hello@instadeep.com"},
