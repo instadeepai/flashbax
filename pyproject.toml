@@ -13,13 +13,13 @@ include = ["flashbax/*"]
 
 [project]
 name = "flashbax"
-description = "Flashbax is a cutting-edge experience replay library oriented around JAX, a high-performance machine learning library that specialises in numerical computing. Tailored to integrate seamlessly with JAX's Just-In-Time (JIT) compilation, Flashbax provides an elegant and efficient solution for experience replay within the scope of reinforcement learning. With the power of JAX at its core, Flashbax offers an unparalleled experience in terms of speed and flexibility. It is designed to optimise memory usage, providing smooth and rapid access to stored experiences that are critical to training advanced reinforcement learning models."
+description = "Flashbax is a experience replay library oriented around JAX. Tailored to integrate seamlessly with JAX's Just-In-Time (JIT) compilation, Flashbax provides an elegant and efficient solution for experience replay within the scope of reinforcement learning."
 readme = "README.md"
 authors = [
   {name="InstaDeep" , email = "hello@instadeep.com"},
 ]
 requires-python = ">=3.9"
-version = "0.0.1" 
+version = "0.0.1"
 classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Environment :: Console",
