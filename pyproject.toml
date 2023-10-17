@@ -1,0 +1,78 @@
+[tool.isort]
+profile = "black"
+skip = [".gitignore", ".dockerignore"]
+
+[tool.mypy]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = ["flashbax/*"]
+
+[project]
+name = "flashbax"
+description = "Flashbax is a cutting-edge experience replay library oriented around JAX, a high-performance machine learning library that specialises in numerical computing. Tailored to integrate seamlessly with JAX's Just-In-Time (JIT) compilation, Flashbax provides an elegant and efficient solution for experience replay within the scope of reinforcement learning. With the power of JAX at its core, Flashbax offers an unparalleled experience in terms of speed and flexibility. It is designed to optimise memory usage, providing smooth and rapid access to stored experiences that are critical to training advanced reinforcement learning models."
+readme = "README.md"
+authors = [
+  {name="InstaDeep" , email = "hello@instadeep.com"},
+]
+requires-python = ">=3.9"
+version = "0.0.1" # Make sure to follow the official versioning format https://peps.python.org/pep-0440/#version-scheme
+classifiers=[
+        "Development Status :: 2 - Pre-Alpha",
+        "Environment :: Console",
+        "Intended Audience :: Science/Research",
+        "Intended Audience :: Developers",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3.9",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "License :: OSI Approved :: Apache Software License",
+    ]
+keywords=["reinforcement-learning", "python", "jax", "memory"]
+dependencies = [
+    'flax>=0.6.11',
+    'chex>=0.1.8',
+    'jax>=0.4.10',
+    'jaxlib>=0.4.10',
+    'numpy>=1.19.5',
+    'typing_extensions<4.6.0'
+]
+
+[project.optional-dependencies]
+dev = [
+    'black>=23.7.0',
+    'coverage>=6.5.0',
+    'flake8>=6.0.0',
+    'isort>=5.12.0',
+    'mkdocs==1.5.3',
+    'mkdocs-git-revision-date-plugin==0.3.2',
+    'mkdocs-include-markdown-plugin==6.0.1',
+    'mkdocs-material==9.4.2',
+    'mkdocs-mermaid2-plugin==1.1.1',
+    'mkdocstrings[python]==0.23.0',
+    'mknotebooks==0.8.0',
+    'mypy>=0.982',
+    'pre-commit>=2.20.0',
+    'pytest>=7.4.2',
+    'pytest-cov>=4.00',
+    'pytest-xdist>=3.0.2'
+    ]
+examples = [
+    'distrax',
+    'dm-haiku',
+    'jumanji',
+    'jupyterlab',
+    'optax',
+    'rlax',
+    'matplotlib',
+    'seaborn',
+    'gymnasium',
+    ]
+
+[project.urls]
+"Homepage" = "https://github.com/instadeepai/flashbax"
+"Bug Tracker" = "https://github.com/instadeepai/flashbax/issues"
+"Repository" = "https://github.com/instadeepai/flashbax.git"
