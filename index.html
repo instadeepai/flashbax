@@ -1,0 +1,1174 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation">
+      
+      
+        <meta name="author" content="InstaDeep Research">
+      
+      
+        <link rel="canonical" href="https://instadeepai.github.io/flashbax/">
+      
+      
+      
+        <link rel="next" href="api/trajectory_buffer/">
+      
+      
+      <link rel="icon" href="img/instadeep_logo.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.2">
+    
+    
+      
+        <title>Flashbax</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.d451bc0e.min.css">
+      
+        
+        <link rel="stylesheet" href="assets/stylesheets/palette.a5377069.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="_static/custom.css">
+    
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.css">
+    
+      <link rel="stylesheet" href="css/ansi-colours.css">
+    
+      <link rel="stylesheet" href="css/pandas-dataframe.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="purple">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#high-speed-buffers-in-jax" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="." title="Flashbax" class="md-header__button md-logo" aria-label="Flashbax" data-md-component="logo">
+      
+  <img src="imgs/instadeep_logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Flashbax
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Home
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5c-.84 0-1.65.15-2.39.42L12 2M3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29L3.34 7m.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14L3.36 17M20.65 7l-1.77 3.79a7.023 7.023 0 0 0-2.38-4.15l4.15.36m-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29L20.64 17M12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44L12 22Z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3 3.19.09m3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95 2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31Z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91 1.61 0 2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08Z"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/instadeepai/flashbax" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    instadeepai/flashbax
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="api/trajectory_buffer/" class="md-tabs__link">
+          
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="." title="Flashbax" class="md-nav__button md-logo" aria-label="Flashbax" data-md-component="logo">
+      
+  <img src="imgs/instadeep_logo.png" alt="logo">
+
+    </a>
+    Flashbax
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/instadeepai/flashbax" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    instadeepai/flashbax
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="." class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    Overview 🔍
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    Features 🛠️
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    Setup 🎬
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quickstart" class="md-nav__link">
+    Quickstart 🏁
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    Examples 🧑‍💻
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#important-considerations" class="md-nav__link">
+    Important Considerations ⚠️
+  </a>
+  
+    <nav class="md-nav" aria-label="Important Considerations ⚠️">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sequential-data-addition" class="md-nav__link">
+    Sequential Data Addition
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#effective-buffer-size" class="md-nav__link">
+    Effective Buffer Size
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#handling-episode-truncation" class="md-nav__link">
+    Handling Episode Truncation
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#independent-data-usage" class="md-nav__link">
+    Independent Data Usage
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#in-place-updating-of-buffer-state" class="md-nav__link">
+    In-place Updating of Buffer State
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#benchmarks" class="md-nav__link">
+    Benchmarks 📈
+  </a>
+  
+    <nav class="md-nav" aria-label="Benchmarks 📈">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cpu-speeds" class="md-nav__link">
+    CPU Speeds
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tpu-speeds" class="md-nav__link">
+    TPU Speeds
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-speeds" class="md-nav__link">
+    GPU Speeds
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu-gpu-tpu-adding-batches" class="md-nav__link">
+    CPU, GPU, &amp; TPU Adding Batches
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    Contributing 🤝
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    See Also 📚
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#citing-flashbax" class="md-nav__link">
+    Citing Flashbax ✏️
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acknowledgements" class="md-nav__link">
+    Acknowledgements 🙏
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_1" id="__nav_2_1_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Buffers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_1">
+            <span class="md-nav__icon md-icon"></span>
+            Buffers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/trajectory_buffer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Trajectory Buffer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/prioritised_trajectory_buffer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prioritised Trajectory Buffer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/flat_buffer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Flat Buffer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/prioritised_flat_buffer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prioritised Flat Buffer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api/trajectory_queue/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Trajectory Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<p align="center">
+    <a href="img/logo.png#gh-light-mode-only">
+        <img src="imgs/logo.png#gh-light-mode-only" alt="Flashbax Logo" width="70%"/>
+    </a>
+    <a href="img/logo_dm.png#gh-dark-mode-only">
+        <img src="imgs/logo_dm.png#gh-dark-mode-only" alt="Flashbax Logo" width="70%"/>
+    </a>
+</p>
+
+<p><a href="https://www.python.org/doc/versions/"><img alt="Python Versions" src="https://img.shields.io/pypi/pyversions/flashbax.svg?style=flat-square" /></a>
+<a href="https://badge.fury.io/py/flashbax"><img alt="PyPI Version" src="https://badge.fury.io/py/flashbax.svg" /></a>
+<a href="https://github.com/instadeepai/flashbax/actions/workflows/tests_linters.yml"><img alt="Tests" src="https://github.com/instadeepai/flashbax/actions/workflows/tests_linters.yml/badge.svg" /></a>
+<a href="https://github.com/psf/black"><img alt="Code Style" src="https://img.shields.io/badge/code%20style-black-000000.svg" /></a>
+<a href="http://mypy-lang.org/"><img alt="MyPy" src="http://www.mypy-lang.org/static/mypy_badge.svg" /></a>
+<a href="https://opensource.org/licenses/Apache-2.0"><img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-orange.svg" /></a></p>
+<div align="center">
+    <h3>
+      <a href="#overview-">Overview</a> |
+      <a href="#features-%EF%B8%8F">Features</a> |
+      <a href="#setup-">Setup</a> |
+      <a href="#quickstart-">Quick Start</a> |
+      <a href="#examples-">Examples</a> |
+      <a href="#important-considerations-%EF%B8%8F">Important Considerations</a> |
+      <a href="#benchmarks-">Benchmarks</a> |
+      <a href="#contributing-">Contributing</a> |
+      <a href="#see-also-">See Also</a> |
+      <a href="#citing">Citing</a> |
+      <a href="#acknowledgements-">Acknowledgments</a>
+    </h3>
+</div>
+
+<hr />
+<h1 id="high-speed-buffers-in-jax">⚡ High Speed Buffers In Jax ⚡<a class="headerlink" href="#high-speed-buffers-in-jax" title="Permanent link">#</a></h1>
+<h2 id="overview">Overview 🔍<a class="headerlink" href="#overview" title="Permanent link">#</a></h2>
+<p>Flashbax is a library designed to streamline the use of experience replay buffers within the context of reinforcement learning (RL). Tailored specifically for compatibility with the JAX paradigm, Flashbax allows these buffers to be easily utilised within fully compiled functions and training loops.</p>
+<p>Flashbax provides an implementation of various different types of buffers, such as Flat Buffer, Trajectory Buffer, and Prioritised variants of both. Whether for academic research, industrial applications, or personal projects, Flashbax offers a simple and flexible framework for RL experience replay handling.</p>
+<h2 id="features">Features 🛠️<a class="headerlink" href="#features" title="Permanent link">#</a></h2>
+<p>🚀 <strong>Efficient Buffer Variants</strong>: All Flashbax buffers are built as specialised variants of the trajectory buffer, optimising memory usage and functionality across various types of buffers.</p>
+<p>🗄️ <strong>Flat Buffer</strong>: The Flat Buffer, akin to the transition buffer used in algorithms like DQN, is a core component. It employs a sequence of 2 (i.e. $s_t$, $s_{t+1}$), with a period of 1 for comprehensive transition pair consideration.</p>
+<p>🛤️ <strong>Trajectory Buffer</strong>: The Trajectory Buffer facilitates the sampling of multi-step trajectories, catering to algorithms utilising recurrent networks like R2D2 (Kapturowski et al., <a href="https://www.deepmind.com/publications/recurrent-experience-replay-in-distributed-reinforcement-learning">2018</a>).</p>
+<p>🏅 <strong>Prioritised Buffers</strong>: Both Flat and Trajectory Buffers can be prioritised, enabling sampling based on user-defined priorities. The prioritisation mechanism aligns with the principles outlined in the PER paper (Schaul et al, <a href="https://arxiv.org/abs/1511.05952">2016</a>).</p>
+<p>🚶 <strong>Trajectory/Flat Queue</strong>: A queue data structure is provided where one is expected to sample data in a FIFO order. The queue can be used for on-policy algorithms with specific use cases.</p>
+<h2 id="setup">Setup 🎬<a class="headerlink" href="#setup" title="Permanent link">#</a></h2>
+<p>To integrate Flashbax into your project, follow these steps:</p>
+<ol>
+<li>
+<p><strong>Installation</strong>: Begin by installing Flashbax using <code>pip</code>:
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span></pre></div></td><td class="code"><div><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>flashbax
+</code></pre></div></td></tr></table></div></p>
+</li>
+<li>
+<p><strong>Selecting Buffers</strong>: Choose from a range of buffer options, including Flat Buffer, Trajectory Buffer, and Prioritised variants.
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="kn">import</span> <span class="nn">flashbax</span> <span class="k">as</span> <span class="nn">fbx</span>
+
+<span class="n">buffer</span> <span class="o">=</span> <span class="n">fbx</span><span class="o">.</span><span class="n">make_trajectory_buffer</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="c1"># OR</span>
+<span class="n">buffer</span> <span class="o">=</span> <span class="n">fbx</span><span class="o">.</span><span class="n">make_prioritised_trajectory_buffer</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="c1"># OR</span>
+<span class="n">buffer</span> <span class="o">=</span> <span class="n">fbx</span><span class="o">.</span><span class="n">make_flat_buffer</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="c1"># OR</span>
+<span class="n">buffer</span> <span class="o">=</span> <span class="n">fbx</span><span class="o">.</span><span class="n">make_prioritised_flat_buffer</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="c1"># OR</span>
+<span class="n">buffer</span> <span class="o">=</span> <span class="n">fbx</span><span class="o">.</span><span class="n">make_trajectory_queue</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+
+<span class="c1"># Initialise</span>
+<span class="n">state</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">example_transition</span><span class="p">)</span>
+<span class="c1"># Add Data</span>
+<span class="n">state</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">example_data</span><span class="p">)</span>
+<span class="c1"># Sample Data</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div></p>
+</li>
+</ol>
+<h2 id="quickstart">Quickstart 🏁<a class="headerlink" href="#quickstart" title="Permanent link">#</a></h2>
+<p>Below we provide a minimal code example for using the flat buffer. In this example, we show how each of the pure functions defining the flat buffer may be used. We note that each of these pure functions is compatible with <code>jax.pmap</code> and <code>jax.jit</code>, but for simplicity, these are not used in the below example.</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="kn">import</span> <span class="nn">jax</span>
+<span class="kn">import</span> <span class="nn">jax.numpy</span> <span class="k">as</span> <span class="nn">jnp</span>
+<span class="kn">import</span> <span class="nn">flashbax</span> <span class="k">as</span> <span class="nn">fbx</span>
+
+<span class="c1"># Instantiate the flat buffer NamedTuple using `make_flat_buffer` using a simple configuration.</span>
+<span class="c1"># The returned `buffer` is simply a container for the pure functions needed for using a flat buffer.</span>
+<span class="n">buffer</span> <span class="o">=</span> <span class="n">fbx</span><span class="o">.</span><span class="n">make_flat_buffer</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">min_length</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sample_batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># Initialise the buffer&#39;s state.</span>
+<span class="n">fake_timestep</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;obs&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span> <span class="s2">&quot;reward&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)}</span>
+<span class="n">state</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">fake_timestep</span><span class="p">)</span>
+
+<span class="c1"># Now we add data to the buffer.</span>
+<span class="n">state</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;obs&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]),</span> <span class="s2">&quot;reward&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="mf">3.0</span><span class="p">)})</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">buffer</span><span class="o">.</span><span class="n">can_sample</span><span class="p">(</span><span class="n">state</span><span class="p">))</span>  <span class="c1"># False because min_length not reached yet.</span>
+
+<span class="n">state</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;obs&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">]),</span> <span class="s2">&quot;reward&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="mf">6.0</span><span class="p">)})</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">buffer</span><span class="o">.</span><span class="n">can_sample</span><span class="p">(</span><span class="n">state</span><span class="p">))</span>  <span class="c1"># Still False because we need 2 *transitions* (i.e. 3 timesteps).</span>
+
+<span class="n">state</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;obs&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">7</span><span class="p">,</span> <span class="mi">8</span><span class="p">]),</span> <span class="s2">&quot;reward&quot;</span><span class="p">:</span> <span class="n">jnp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="mf">9.0</span><span class="p">)})</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">buffer</span><span class="o">.</span><span class="n">can_sample</span><span class="p">(</span><span class="n">state</span><span class="p">))</span>  <span class="c1"># True! We have 2 transitions (3 timesteps).</span>
+
+<span class="c1"># Get a transition from the buffer.</span>
+<span class="n">rng_key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">PRNGKey</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># Source of randomness.</span>
+<span class="n">batch</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">rng_key</span><span class="p">)</span>  <span class="c1"># Sample</span>
+
+<span class="c1"># We have a transition! Prints: obs = [[4 5]], obs&#39; = [[7 8]]</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;obs = </span><span class="si">{</span><span class="n">batch</span><span class="o">.</span><span class="n">experience</span><span class="o">.</span><span class="n">first</span><span class="p">[</span><span class="s1">&#39;obs&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, obs&#39; = </span><span class="si">{</span><span class="n">batch</span><span class="o">.</span><span class="n">experience</span><span class="o">.</span><span class="n">second</span><span class="p">[</span><span class="s1">&#39;obs&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+<h2 id="examples">Examples 🧑‍💻<a class="headerlink" href="#examples" title="Permanent link">#</a></h2>
+<p>We provide the following Colab examples for a more advanced tutorial on how to use each of the flashbax buffers as well as usage examples:</p>
+<table>
+<thead>
+<tr>
+<th>Colab Notebook</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_flat_buffer.ipynb"><img alt="Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+<td>Flat Buffer Quickstart</td>
+</tr>
+<tr>
+<td><a href="https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_trajectory_buffer.ipynb"><img alt="Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+<td>Trajectory Buffer Quickstart</td>
+</tr>
+<tr>
+<td><a href="https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_prioritised_flat_buffer.ipynb"><img alt="Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+<td>Prioritised Flat Buffer Quickstart</td>
+</tr>
+<tr>
+<td><a href="https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/anakin_dqn_example.ipynb"><img alt="Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+<td>Anakin DQN</td>
+</tr>
+<tr>
+<td><a href="https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/anakin_prioritised_dqn_example.ipynb"><img alt="Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+<td>Anakin Prioritised DQN</td>
+</tr>
+<tr>
+<td><a href="https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/anakin_ppo_example.ipynb"><img alt="Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+<td>Anakin PPO</td>
+</tr>
+<tr>
+<td><a href="https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/gym_dqn_example.ipynb"><img alt="Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+<td>DQN with Vectorised Gym Environments</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>👾 <a href="https://arxiv.org/abs/2104.06272">Anakin</a> - JAX based architecture for jit compiling the training
+of RL agents end-to-end.</li>
+<li>🎮 <a href="https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/dqn_jax.py">DQN</a> - implementation adapted
+from CleanRLs DQN JAX example.</li>
+<li>🦎 <a href="https://github.com/instadeepai/jumanji/">Jumanji</a> - utilise Jumanji's JAX based environments
+like Snake for our fully jitted examples.</li>
+</ul>
+<h2 id="important-considerations">Important Considerations ⚠️<a class="headerlink" href="#important-considerations" title="Permanent link">#</a></h2>
+<p>When working with Flashbax buffers, it's crucial to be mindful of certain considerations to ensure the proper functionality of your RL agent.</p>
+<h3 id="sequential-data-addition">Sequential Data Addition<a class="headerlink" href="#sequential-data-addition" title="Permanent link">#</a></h3>
+<p>Flashbax uses a trajectory buffer as the foundation for all buffer types. This means that data must be added sequentially. Specifically, for the flat buffer, each added transition must be followed by its consecutive transition. In most scenarios, this requirement is naturally satisfied and doesn't demand extensive consideration. However, it's essential to be aware of this constraint, especially when adding batches of data that are completely independent of each other. Failing to maintain the sequence relationship between transitions can lead to algorithmic issues. The user is expected to handle the case of final to first transition. This happens when going from episode <code>n</code> to episode <code>n+1</code> in the same batch. For example, we utilise auto reset wrappers to automatically reset the environment upon a terminal transition. Additionally, we utilise discount values (1 for non-terminal state, 0 for terminal state) to mask the value function and discounting of rewards accordingly.</p>
+<h3 id="effective-buffer-size">Effective Buffer Size<a class="headerlink" href="#effective-buffer-size" title="Permanent link">#</a></h3>
+<p>When adding batches of data, the buffer is created in a block-like structure. This means that the effective buffer size is dependent on the size of the batch dimension. The trajectory buffer allows a user to specify the add batch dimension and the max length of the time axis. This will create a block structure of (batch, time) allowing the maximum number of timesteps that can be in storage to be batch*time. For ease of use, we provide the max size argument that allows a user to set their total desired number of timesteps and we calculate the max length of the time axis dependent on the add batch dimension that is provided. Due to this, it is important to note that when using the max size argument, the max length of the time axis will be equal to max size // add batch size which will round down thereby reducing the effective buffer size. This means one might think they are increasing the buffer size by a certain amount but in actuality there is no increase. Therefore, to avoid this, we recommend one of two things: Use the max length time axis argument explicitly or increase the max size argument in multiples of the add batch size.</p>
+<h3 id="handling-episode-truncation">Handling Episode Truncation<a class="headerlink" href="#handling-episode-truncation" title="Permanent link">#</a></h3>
+<p>Another critical aspect is episode truncation. When truncating episodes and adding data to the buffer, it's vital to ensure that you set a done flag or a 'discount' value appropriately. Neglecting to do so can introduce challenges into your algorithm's implementation and behavior. As stated previously, it is expected that the algorithm handles these cases appropriately.</p>
+<h3 id="independent-data-usage">Independent Data Usage<a class="headerlink" href="#independent-data-usage" title="Permanent link">#</a></h3>
+<p>For situations where you intend to utilise buffers with data that lack sequential information, you can leverage a trajectory buffer with specific configurations. By setting a sequence dimension of 1 and a period of 1, each item will be treated as independent. However, when working with independent transition items like (observation, action, reward, discount, next_observation), be mindful that this approach will result in duplicate observations within the buffer, leading to unnecessary memory consumption. It is important to note that the implementation of the flat buffer will be slower than utilising a trajectory buffer in this way due to the inherent speed issues that arise with data indexing on hardware accelerators; however, this trade-off is done to enhance memory efficiency. If speed is largely preferred over memory efficiency then use the trajectory buffer with sequence 1 and period 1 storing full transition data items.</p>
+<h3 id="in-place-updating-of-buffer-state">In-place Updating of Buffer State<a class="headerlink" href="#in-place-updating-of-buffer-state" title="Permanent link">#</a></h3>
+<p>Since buffers are generally large and occupy a significant portion of device memory, it is beneficial to perform in-place updates. To do this, it is important to specify to the top-level compiled function that you would like to perform this in-place update operation. This is indicated as follows:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="n">train_state</span><span class="p">,</span> <span class="n">buffer_state</span><span class="p">):</span>
+    <span class="o">...</span>
+    <span class="k">return</span> <span class="n">train_state</span><span class="p">,</span> <span class="n">buffer_state</span>
+
+<span class="c1"># Initialise the buffer state</span>
+<span class="n">buffer_fn</span> <span class="o">=</span> <span class="n">fbx</span><span class="o">.</span><span class="n">make_trajectory_buffer</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="n">buffer_state</span> <span class="o">=</span> <span class="n">buffer_fn</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">example_transition</span><span class="p">)</span>
+
+<span class="c1"># Initialise some training state</span>
+<span class="n">train_state</span> <span class="o">=</span> <span class="n">train_state</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+
+<span class="c1"># Compile the training function and specify the donation of the buffer state argument</span>
+<span class="n">train_state</span><span class="p">,</span> <span class="n">buffer_state</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">train</span><span class="p">,</span> <span class="n">donate_argnums</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,))(</span>
+    <span class="n">train_state</span><span class="p">,</span> <span class="n">buffer_state</span>
+<span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+<p>It is important to include <code>donate_argnums</code> when calling <code>jax.jit</code> to enable JAX to perform an in-place update of the replay buffer state. Omitting <code>donate_argnums</code> would force JAX to create a copy of the state for any modifications to the replay buffer state, potentially negating all performance benefits. More information about buffer donation in JAX can be found in the <a href="https://jax.readthedocs.io/en/latest/faq.html#buffer-donation">documentation</a>. Please take into account that buffer donation is not applicable on the CPU.</p>
+<p>In summary, understanding and addressing these considerations will help you navigate potential pitfalls and ensure the effectiveness of your reinforcement learning strategies while utilising Flashbax buffers.</p>
+<h2 id="benchmarks">Benchmarks 📈<a class="headerlink" href="#benchmarks" title="Permanent link">#</a></h2>
+<p>Here we provide a series of initial benchmarks outlining the performance of the various Flashbax buffers compared against commonly used open-source buffers. In these benchmarks we (unless explicitly stated otherwise) use the following configuration:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Buffer Size</td>
+<td>500_000</td>
+</tr>
+<tr>
+<td>Sample Batch Size</td>
+<td>256</td>
+</tr>
+<tr>
+<td>Observation Size</td>
+<td>(32, 32, 3)</td>
+</tr>
+<tr>
+<td>Add Sequence Length</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Add Sequence Batch Size</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Sample Sequence Length</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Sample Sequence Period</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>The reason we use a sample sequence length and period of 1 is to directly compare to the other buffers. This essentially means that the trajectory buffers are being used as memory inefficent transition buffers. It is important to note that the Flat Buffer implementations use a sample sequence length of 2. Additionally, one must bear in mind that not all other buffer implementations can efficiently make use of GPUs/TPUs thus they simply run on the CPU and perform device conversions. Lastly, we explicitly make use of python loops to fairly compare to the other buffers. Speeds can be largely improved using scan operations (depending on observation size).</p>
+<h3 id="cpu-speeds">CPU Speeds<a class="headerlink" href="#cpu-speeds" title="Permanent link">#</a></h3>
+<p float="left">
+<img alt="CPU_Add" src="imgs/cpu_add.png" width="49%">
+<img alt="CPU_Sample" src="imgs/cpu_sample.png" width="49%">
+</p>
+
+<h3 id="tpu-speeds">TPU Speeds<a class="headerlink" href="#tpu-speeds" title="Permanent link">#</a></h3>
+<p float="left">
+<img alt="TPU_Add" src="imgs/tpu_add.png" width="49%">
+<img alt="TPU_Sample" src="imgs/tpu_sample.png" width="49%">
+</p>
+
+<h3 id="gpu-speeds">GPU Speeds<a class="headerlink" href="#gpu-speeds" title="Permanent link">#</a></h3>
+<p>We notice strange behaviour with the GPU speeds when adding data. We believe this is due to the fact that certain JAX operations are not yet fully optimised for GPU usage as we see Dejax has the same performance issues. We expect these speeds to improve in the future.</p>
+<p float="left">
+<img alt="GPU_Add" src="imgs/gpu_add.png" width="49%">
+<img alt="GPU_Sample" src="imgs/gpu_sample.png" width="49%">
+</p>
+
+<h3 id="cpu-gpu-tpu-adding-batches">CPU, GPU, &amp; TPU Adding Batches<a class="headerlink" href="#cpu-gpu-tpu-adding-batches" title="Permanent link">#</a></h3>
+<p>Previous benchmarks added a single transition at a time, we now evaluate adding batches of 128 transitions at a time. We only compare to the buffers which have this capability.</p>
+<p float="left">
+<img alt="CPU_Add_Batch" src="imgs/cpu_add_batch.png" width="49%">
+<img alt="TPU_Add_Batch" src="imgs/tpu_add_batch.png" width="49%">
+</p>
+
+<p align="center">
+<img alt="GPU_Add_Batch" src="imgs/gpu_add_batch.png" width="49%">
+</p>
+
+<p>Ultimately, we see improved or comparable performance to benchmarked buffers whilst providing buffers that are fully JAX-compatible. We do note that due to JAX having different XLA backends for CPU, GPU, and TPU, the performance of the buffers can vary depending on the device.</p>
+<h2 id="contributing">Contributing 🤝<a class="headerlink" href="#contributing" title="Permanent link">#</a></h2>
+<p>Contributions are welcome! See our issue tracker for
+<a href="https://github.com/instadeepai/flashbax/labels/good%20first%20issue">good first issues</a>. Please read
+our <a href="https://github.com/instadeepai/flashbax/blob/main/CONTRIBUTING.md">contributing guidelines</a> for
+details on how to submit pull requests, our Contributor License Agreement, and community guidelines.</p>
+<h2 id="see-also">See Also 📚<a class="headerlink" href="#see-also" title="Permanent link">#</a></h2>
+<p>Checkout some of the other buffer libraries from the community that we have highlighted in our
+benchmarks.</p>
+<ul>
+<li>📀 <a href="https://github.com/hr0nix/dejax">Dejax</a>: the first library to provide a JAX-compatible replay buffers.</li>
+<li>🎶 <a href="https://github.com/google-deepmind/reverb">Reverb</a>: efficient replay buffers used for both local and large-scale distributed RL.</li>
+<li>🍰 <a href="https://github.com/google/dopamine/blob/master/dopamine/replay_memory/">Dopamine</a>: research framework for fast prototyping, providing several core replay buffers.</li>
+<li>🤖 <a href="https://stable-baselines3.readthedocs.io/en/master/">StableBaselines3</a>: suite of reliable RL baselines with its own, easy-to-use replay buffers.</li>
+</ul>
+<h2 id="citing-flashbax">Citing Flashbax ✏️<a class="headerlink" href="#citing-flashbax" title="Permanent link">#</a></h2>
+<p>If you use Flashbax in your work, please cite the library using:</p>
+<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span>
+<span class="normal">4</span>
+<span class="normal">5</span>
+<span class="normal">6</span>
+<span class="normal">7</span></pre></div></td><td class="code"><div><pre><span></span><code>@misc{flashbax,
+    title={Flashbax: Streamlining Experience Replay Buffers for Reinforcement Learning with JAX},
+    author={Edan Toledo and Laurence Midgley and Donal Byrne and Callum Rhys Tilbury and
+    Matthew Macfarlane and Cyprien Courtot and Alexandre Laterre},
+    year={2023},
+    url={https://github.com/instadeepai/flashbax/},
+}
+</code></pre></div></td></tr></table></div>
+<h2 id="acknowledgements">Acknowledgements 🙏<a class="headerlink" href="#acknowledgements" title="Permanent link">#</a></h2>
+<p>The development of this library was supported with Cloud TPUs
+from Google's <a href="https://sites.research.google/trc/about/">TPU Research Cloud</a> (TRC) 🌤.</p>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+            Back to top
+          </button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      InstaDeep © 2023 Copyright, all rights reserved.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": ".", "features": ["navigation.tracking", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.indexes", "search.highlight", "search.share", "search.suggest", "toc.integrate", "toc.follow", "content.code.annotate", "navigation.tabs", "navigation.top"], "search": "assets/javascripts/workers/search.a264c092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="assets/javascripts/bundle.726fbb30.min.js"></script>
+      
+        <script src="javascripts/katex.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/contrib/auto-render.min.js"></script>
+      
+    
+  </body>
+</html>
