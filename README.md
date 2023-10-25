@@ -79,7 +79,7 @@ buffer = fbx.make_prioritised_flat_buffer(...)
 buffer = fbx.make_trajectory_queue(...)
 
 # Initialise
-state = buffer.init(example_transition)
+state = buffer.init(example_timestep)
 # Add Data
 state = buffer.add(state, example_data)
 # Sample Data
@@ -149,7 +149,7 @@ like Snake for our fully jitted examples.
 When working with Flashbax buffers, it's crucial to be mindful of certain considerations to ensure the proper functionality of your RL agent.
 
 ### Sequential Data Addition
-Flashbax uses a trajectory buffer as the foundation for all buffer types. This means that data must be added sequentially. Specifically, for the flat buffer, each added transition must be followed by its consecutive transition. In most scenarios, this requirement is naturally satisfied and doesn't demand extensive consideration. However, it's essential to be aware of this constraint, especially when adding batches of data that are completely independent of each other. Failing to maintain the sequence relationship between transitions can lead to algorithmic issues. The user is expected to handle the case of final to first transition. This happens when going from episode `n` to episode `n+1` in the same batch. For example, we utilise auto reset wrappers to automatically reset the environment upon a terminal transition. Additionally, we utilise discount values (1 for non-terminal state, 0 for terminal state) to mask the value function and discounting of rewards accordingly.
+Flashbax uses a trajectory buffer as the foundation for all buffer types. This means that data must be added sequentially. Specifically, for the flat buffer, each added timestep must be followed by its consecutive timestep. In most scenarios, this requirement is naturally satisfied and doesn't demand extensive consideration. However, it's essential to be aware of this constraint, especially when adding batches of data that are completely independent of each other. Failing to maintain the sequence relationship between timesteps can lead to algorithmic issues. The user is expected to handle the case of final to first timestep. This happens when going from episode `n` to episode `n+1` in the same batch. For example, we utilise auto reset wrappers to automatically reset the environment upon a terminal timestep. Additionally, we utilise discount values (1 for non-terminal state, 0 for terminal state) to mask the value function and discounting of rewards accordingly.
 
 ### Effective Buffer Size
 When adding batches of data, the buffer is created in a block-like structure. This means that the effective buffer size is dependent on the size of the batch dimension. The trajectory buffer allows a user to specify the add batch dimension and the max length of the time axis. This will create a block structure of (batch, time) allowing the maximum number of timesteps that can be in storage to be batch*time. For ease of use, we provide the max size argument that allows a user to set their total desired number of timesteps and we calculate the max length of the time axis dependent on the add batch dimension that is provided. Due to this, it is important to note that when using the max size argument, the max length of the time axis will be equal to max size // add batch size which will round down thereby reducing the effective buffer size. This means one might think they are increasing the buffer size by a certain amount but in actuality there is no increase. Therefore, to avoid this, we recommend one of two things: Use the max length time axis argument explicitly or increase the max size argument in multiples of the add batch size.
@@ -171,7 +171,7 @@ def train(train_state, buffer_state):
 
 # Initialise the buffer state
 buffer_fn = fbx.make_trajectory_buffer(...)
-buffer_state = buffer_fn.init(example_transition)
+buffer_state = buffer_fn.init(example_timestep)
 
 # Initialise some training state
 train_state = train_state.init(...)
@@ -225,7 +225,7 @@ We notice strange behaviour with the GPU speeds when adding data. We believe thi
 </p>
 
 ### CPU, GPU, & TPU Adding Batches
-Previous benchmarks added a single transition at a time, we now evaluate adding batches of 128 transitions at a time. We only compare to the buffers which have this capability.
+Previous benchmarks added only a single timestep at a time, we now evaluate adding batches of 128 timesteps at a time - a feature that most would use in high-throughput RL. We only compare to the buffers which have this capability.
 
 <p float="left">
 <img alt="CPU_Add_Batch" src="docs/imgs/cpu_add_batch.png" width="49%">
@@ -236,7 +236,7 @@ Previous benchmarks added a single transition at a time, we now evaluate adding 
 <img alt="GPU_Add_Batch" src="docs/imgs/gpu_add_batch.png" width="49%">
 </p>
 
-Ultimately, we see improved or comparable performance to benchmarked buffers whilst providing buffers that are fully JAX-compatible. We do note that due to JAX having different XLA backends for CPU, GPU, and TPU, the performance of the buffers can vary depending on the device.
+Ultimately, we see improved or comparable performance to benchmarked buffers whilst providing buffers that are fully JAX-compatible in addition to other features such as batched adding as well as being able to add sequences of varying length. We do note that due to JAX having different XLA backends for CPU, GPU, and TPU, the performance of the buffers can vary depending on the device and the specific operation being called.
 
 ## Contributing 🤝
 
