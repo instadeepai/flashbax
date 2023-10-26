@@ -844,7 +844,7 @@
 <span class="n">buffer</span> <span class="o">=</span> <span class="n">fbx</span><span class="o">.</span><span class="n">make_trajectory_queue</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
 
 <span class="c1"># Initialise</span>
-<span class="n">state</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">example_transition</span><span class="p">)</span>
+<span class="n">state</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">example_timestep</span><span class="p">)</span>
 <span class="c1"># Add Data</span>
 <span class="n">state</span> <span class="o">=</span> <span class="n">buffer</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">example_data</span><span class="p">)</span>
 <span class="c1"># Sample Data</span>
@@ -965,7 +965,7 @@ like Snake for our fully jitted examples.</li>
 <h2 id="important-considerations">Important Considerations ⚠️<a class="headerlink" href="#important-considerations" title="Permanent link">#</a></h2>
 <p>When working with Flashbax buffers, it's crucial to be mindful of certain considerations to ensure the proper functionality of your RL agent.</p>
 <h3 id="sequential-data-addition">Sequential Data Addition<a class="headerlink" href="#sequential-data-addition" title="Permanent link">#</a></h3>
-<p>Flashbax uses a trajectory buffer as the foundation for all buffer types. This means that data must be added sequentially. Specifically, for the flat buffer, each added transition must be followed by its consecutive transition. In most scenarios, this requirement is naturally satisfied and doesn't demand extensive consideration. However, it's essential to be aware of this constraint, especially when adding batches of data that are completely independent of each other. Failing to maintain the sequence relationship between transitions can lead to algorithmic issues. The user is expected to handle the case of final to first transition. This happens when going from episode <code>n</code> to episode <code>n+1</code> in the same batch. For example, we utilise auto reset wrappers to automatically reset the environment upon a terminal transition. Additionally, we utilise discount values (1 for non-terminal state, 0 for terminal state) to mask the value function and discounting of rewards accordingly.</p>
+<p>Flashbax uses a trajectory buffer as the foundation for all buffer types. This means that data must be added sequentially. Specifically, for the flat buffer, each added timestep must be followed by its consecutive timestep. In most scenarios, this requirement is naturally satisfied and doesn't demand extensive consideration. However, it's essential to be aware of this constraint, especially when adding batches of data that are completely independent of each other. Failing to maintain the sequence relationship between timesteps can lead to algorithmic issues. The user is expected to handle the case of final to first timestep. This happens when going from episode <code>n</code> to episode <code>n+1</code> in the same batch. For example, we utilise auto reset wrappers to automatically reset the environment upon a terminal timestep. Additionally, we utilise discount values (1 for non-terminal state, 0 for terminal state) to mask the value function and discounting of rewards accordingly.</p>
 <h3 id="effective-buffer-size">Effective Buffer Size<a class="headerlink" href="#effective-buffer-size" title="Permanent link">#</a></h3>
 <p>When adding batches of data, the buffer is created in a block-like structure. This means that the effective buffer size is dependent on the size of the batch dimension. The trajectory buffer allows a user to specify the add batch dimension and the max length of the time axis. This will create a block structure of (batch, time) allowing the maximum number of timesteps that can be in storage to be batch*time. For ease of use, we provide the max size argument that allows a user to set their total desired number of timesteps and we calculate the max length of the time axis dependent on the add batch dimension that is provided. Due to this, it is important to note that when using the max size argument, the max length of the time axis will be equal to max size // add batch size which will round down thereby reducing the effective buffer size. This means one might think they are increasing the buffer size by a certain amount but in actuality there is no increase. Therefore, to avoid this, we recommend one of two things: Use the max length time axis argument explicitly or increase the max size argument in multiples of the add batch size.</p>
 <h3 id="handling-episode-truncation">Handling Episode Truncation<a class="headerlink" href="#handling-episode-truncation" title="Permanent link">#</a></h3>
@@ -994,7 +994,7 @@ like Snake for our fully jitted examples.</li>
 
 <span class="c1"># Initialise the buffer state</span>
 <span class="n">buffer_fn</span> <span class="o">=</span> <span class="n">fbx</span><span class="o">.</span><span class="n">make_trajectory_buffer</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-<span class="n">buffer_state</span> <span class="o">=</span> <span class="n">buffer_fn</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">example_transition</span><span class="p">)</span>
+<span class="n">buffer_state</span> <span class="o">=</span> <span class="n">buffer_fn</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">example_timestep</span><span class="p">)</span>
 
 <span class="c1"># Initialise some training state</span>
 <span class="n">train_state</span> <span class="o">=</span> <span class="n">train_state</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
@@ -1067,7 +1067,7 @@ like Snake for our fully jitted examples.</li>
 </p>
 
 <h3 id="cpu-gpu-tpu-adding-batches">CPU, GPU, &amp; TPU Adding Batches<a class="headerlink" href="#cpu-gpu-tpu-adding-batches" title="Permanent link">#</a></h3>
-<p>Previous benchmarks added a single transition at a time, we now evaluate adding batches of 128 transitions at a time. We only compare to the buffers which have this capability.</p>
+<p>Previous benchmarks added only a single timestep at a time, we now evaluate adding batches of 128 timesteps at a time - a feature that most would use in high-throughput RL. We only compare to the buffers which have this capability.</p>
 <p float="left">
 <img alt="CPU_Add_Batch" src="imgs/cpu_add_batch.png" width="49%">
 <img alt="TPU_Add_Batch" src="imgs/tpu_add_batch.png" width="49%">
@@ -1077,7 +1077,7 @@ like Snake for our fully jitted examples.</li>
 <img alt="GPU_Add_Batch" src="imgs/gpu_add_batch.png" width="49%">
 </p>
 
-<p>Ultimately, we see improved or comparable performance to benchmarked buffers whilst providing buffers that are fully JAX-compatible. We do note that due to JAX having different XLA backends for CPU, GPU, and TPU, the performance of the buffers can vary depending on the device.</p>
+<p>Ultimately, we see improved or comparable performance to benchmarked buffers whilst providing buffers that are fully JAX-compatible in addition to other features such as batched adding as well as being able to add sequences of varying length. We do note that due to JAX having different XLA backends for CPU, GPU, and TPU, the performance of the buffers can vary depending on the device and the specific operation being called.</p>
 <h2 id="contributing">Contributing 🤝<a class="headerlink" href="#contributing" title="Permanent link">#</a></h2>
 <p>Contributions are welcome! See our issue tracker for
 <a href="https://github.com/instadeepai/flashbax/labels/good%20first%20issue">good first issues</a>. Please read
