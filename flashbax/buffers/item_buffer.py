@@ -41,7 +41,7 @@ def validate_item_buffer_args(
     min_length: int,
     sample_batch_size: int,
 ):
-    """Validates the arguments for the flat buffer."""
+    """Validates the arguments for the item buffer."""
 
     validate_sample_batch_size(sample_batch_size, max_length)
     validate_min_length(min_length, max_length)
