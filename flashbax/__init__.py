@@ -15,7 +15,9 @@
 
 from flashbax.buffers import (
     flat_buffer,
+    item_buffer,
     make_flat_buffer,
+    make_item_buffer,
     make_prioritised_flat_buffer,
     make_prioritised_trajectory_buffer,
     make_trajectory_buffer,
