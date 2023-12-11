@@ -15,6 +15,7 @@
 import asyncio
 import json
 import os
+from ast import literal_eval as make_tuple
 from datetime import datetime
 from typing import Any, Optional, Tuple
 
@@ -41,8 +42,8 @@ VERSION = 0.1
 class Vault:
     def __init__(
         self,
-        init_fbx_state: TrajectoryBufferState,
         vault_name: str,
+        init_fbx_state: Optional[TrajectoryBufferState] = None,
         rel_dir: str = "vaults",
         vault_uid: Optional[str] = None,
         metadata: Optional[dict] = None,
@@ -58,9 +59,14 @@ class Vault:
         base_path_exists = os.path.exists(self._base_path)
         if base_path_exists:
             self._metadata = json.loads(metadata_path.read_text())
+
             # Ensure minor versions match
             assert (self._metadata["version"] // 1) == (VERSION // 1)
-        else:
+    
+        elif init_fbx_state is not None:
+            # init_fbx_state must be a TrajectoryBufferState
+            assert isinstance(init_fbx_state, TrajectoryBufferState)
+
             # Create the necessary dirs for the vault
             os.makedirs(self._base_path)
 
@@ -79,11 +85,18 @@ class Vault:
                     return obj
 
             metadata_json_ready = jax.tree_util.tree_map(get_json_ready, metadata)
+            experience_structure = jax.tree_map(
+                lambda x: [str(x.shape), str(x.dtype)],
+                init_fbx_state.experience,
+            )
             self._metadata = {
                 "version": VERSION,
+                "structure": experience_structure,
                 **(metadata_json_ready or {}),  # Allow user to save extra metadata
             }
             metadata_path.write_text(json.dumps(self._metadata))
+        else:
+            raise ValueError("Vault does not exist and no init_fbx_state provided.")
 
         # Keep a data store for the vault index
         self._vault_index_ds = ts.open(
@@ -101,45 +114,46 @@ class Vault:
                 leaf=x,
                 create_checkpoint=not base_path_exists,
             ),
-            init_fbx_state.experience,
+            self._metadata['structure'],
+            is_leaf=lambda x: isinstance(x, list),
         )
 
-        # Just store one timestep for the structure
-        self._fbx_sample_experience = jax.tree_map(
-            lambda x: x[:, 0:1, ...],
-            init_fbx_state.experience,
-        )
         self._last_received_fbx_index = 0
+
 
     def _get_base_spec(self, name: str) -> dict:
         return {
             "driver": "zarr",
             "kvstore": {
                 "driver": "ocdbt",
-                "base": f"{DRIVER}{self._base_path}",  # TODO: does this work on other systems?
+                "base": f"{DRIVER}{self._base_path}",
                 "path": name,
             },
         }
 
-    def _init_leaf(self, name: str, leaf: Array, create_checkpoint: bool = False) -> ts.TensorStore:
+    def _init_leaf(self, name: str, leaf: list, create_checkpoint: bool = False) -> ts.TensorStore:
         spec = self._get_base_spec(name)
+        leaf_shape = make_tuple(leaf[0])
+        leaf_dtype = leaf[1]
         leaf_ds = ts.open(
             spec,
-            dtype=leaf.dtype if create_checkpoint else None,
+            # Only specify dtype and shape if we are creating a checkpoint
+            dtype=leaf_dtype if create_checkpoint else None,
             shape=(
-                leaf.shape[0],  # Batch dim
+                leaf_shape[0],  # Batch dim
                 TIME_AXIS_MAX_LENGTH,  # Time dim
-                *leaf.shape[2:],  # Experience dim
+                *leaf_shape[2:],  # Experience dim
             )
             if create_checkpoint
             else None,
+            # Only create directory if we are creating a checkpoint
             create=create_checkpoint,
-        ).result()
+        ).result()  # Synchronous
         return leaf_ds
 
     async def _write_leaf(
         self,
-        source_leaf: Array,
+        source_leaf: jax.Array,
         dest_leaf: ts.TensorStore,
         source_interval: Tuple[int, int],
         dest_start: int,
@@ -251,42 +265,36 @@ class Vault:
     ) -> Array:
         return read_leaf[:, slice(*read_interval), ...].read().result()
 
-    def read(self, read_interval: Tuple[int, int] = (0, 0)) -> Array:  # TODO typing
-        if read_interval == (0, 0):
-            read_interval = (0, self.vault_index)  # Read all that has been written
+    def read(
+        self,
+        timesteps: Optional[int] = None,
+        percentiles: Optional[Tuple[int, int]] = None,
+    ) -> TrajectoryBufferState:
+        """Read from the vault."""
+
+        if timesteps is None and percentiles is None:
+            read_interval = (0, self.vault_index)
+        elif timesteps is not None:
+            read_interval = (self.vault_index - timesteps, self.vault_index)
+        elif percentiles is not None:
+            assert percentiles[0] < percentiles[1], "Percentiles must be in ascending order."
+            read_interval = (
+                int(self.vault_index * (percentiles[0] / 100)),
+                int(self.vault_index * (percentiles[1] / 100)),
+            )
 
         read_result = jax.tree_util.tree_map(
             lambda _, ds: self._read_leaf(
                 read_leaf=ds,
                 read_interval=read_interval,
             ),
-            self._fbx_sample_experience,  # just for structure
+            self._metadata['structure'],  # just for structure
             self._all_ds,  # data stores
-        )
-        return read_result
-
-    def get_full_buffer(self) -> TrajectoryBufferState:
-        return TrajectoryBufferState(
-            experience=self.read(),
-            current_index=self.vault_index,
-            is_full=True,
+            is_leaf=lambda x: isinstance(x, list),
         )
 
-    def get_buffer(
-        self, size: int, key: Array, starting_index: Optional[int] = None
-    ) -> TrajectoryBufferState:
-        assert size <= self.vault_index
-        if starting_index is None:
-            starting_index = int(
-                jax.random.randint(
-                    key=key,
-                    shape=(),
-                    minval=0,
-                    maxval=self.vault_index - size,
-                )
-            )
         return TrajectoryBufferState(
-            experience=self.read((starting_index, starting_index + size)),
-            current_index=starting_index + size,
-            is_full=True,
+            experience=read_result,
+            current_index=jnp.array(self.vault_index, dtype=int),
+            is_full=jnp.array(True, dtype=bool),
         )
