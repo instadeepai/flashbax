@@ -28,7 +28,6 @@ from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flashbax.utils import get_tree_shape_prefix
 
 # CURRENT LIMITATIONS / TODO LIST
-# - Anakin -> extra minibatch dim...
 # - Async reading if necessary
 # - Only tested with flat buffers
 # - Reloading could be nicer, but doing so is tricky!
@@ -178,7 +177,7 @@ class Vault:
         fbx_state: TrajectoryBufferState,
         source_interval: Tuple[int, int] = (0, 0),
         dest_start: Optional[int] = None,
-    ) -> None:
+    ) -> int:
         # TODO: more than one current_index if B > 1
         fbx_current_index = int(fbx_state.current_index)
 
@@ -188,7 +187,7 @@ class Vault:
 
         if source_interval[1] == source_interval[0]:
             # Nothing to write
-            return
+            return 0
 
         elif source_interval[1] > source_interval[0]:
             # Vanilla write, no wrap around
@@ -236,25 +235,14 @@ class Vault:
 
             written_length = time_length_a + time_length_b
 
-        # print(
-        #     f"Incoming fbx index was {fbx_current_index}, \
-        #         vs last received {self._last_received_fbx_index}"
-        # )
-        # print(
-        #     f"Wrote {source_interval} into {(dest_start, dest_start +  written_length)}\
-        #         (steps = {written_length}) to vault"
-        # )
-        # print(
-        #     f"Vault index is now \
-        #     {self.vault_index + written_length}"
-        # )
-
         # Update vault index, and write this to the ds too
         self.vault_index += written_length
         self._vault_index_ds.write(self.vault_index).result()
 
         # Keep track of the last fbx buffer idx received
         self._last_received_fbx_index = fbx_current_index
+
+        return written_length
 
     def _read_leaf(
         self,
