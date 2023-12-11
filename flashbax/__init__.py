@@ -25,4 +25,3 @@ from flashbax.buffers import (
     trajectory_buffer,
     trajectory_queue,
 )
-from flashbax.vault import Vault
