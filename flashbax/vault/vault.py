@@ -1,4 +1,4 @@
-# Copyright 2022 InstaDeep Ltd. All rights reserved.
+# Copyright 2023 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,17 +21,16 @@ from typing import Any, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
-import tensorstore as ts
+import tensorstore as ts  # type: ignore
 from chex import Array
-from etils import epath
+from etils import epath  # type: ignore
 
 from flashbax.buffers.trajectory_buffer import TrajectoryBufferState
 from flashbax.utils import get_tree_shape_prefix
 
 # CURRENT LIMITATIONS / TODO LIST
-# - Async reading if necessary
 # - Only tested with flat buffers
-# - Reloading could be nicer, but doing so is tricky!
+# - Reloading must be with dicts, not namedtuples
 
 DRIVER = "file://"
 METADATA_FILE = "metadata.json"
@@ -48,7 +47,6 @@ class Vault:
         vault_uid: Optional[str] = None,
         metadata: Optional[dict] = None,
     ) -> None:
-
         vault_str = vault_uid if vault_uid else datetime.now().strftime("%Y%m%d%H%M%S")
         self._base_path = os.path.join(os.getcwd(), rel_dir, vault_name, vault_str)
 
@@ -62,7 +60,7 @@ class Vault:
 
             # Ensure minor versions match
             assert (self._metadata["version"] // 1) == (VERSION // 1)
-    
+
         elif init_fbx_state is not None:
             # init_fbx_state must be a TrajectoryBufferState
             assert isinstance(init_fbx_state, TrajectoryBufferState)
@@ -114,12 +112,11 @@ class Vault:
                 leaf=x,
                 create_checkpoint=not base_path_exists,
             ),
-            self._metadata['structure'],
+            self._metadata["structure"],
             is_leaf=lambda x: isinstance(x, list),
         )
 
         self._last_received_fbx_index = 0
-
 
     def _get_base_spec(self, name: str) -> dict:
         return {
@@ -131,7 +128,9 @@ class Vault:
             },
         }
 
-    def _init_leaf(self, name: str, leaf: list, create_checkpoint: bool = False) -> ts.TensorStore:
+    def _init_leaf(
+        self, name: str, leaf: list, create_checkpoint: bool = False
+    ) -> ts.TensorStore:
         spec = self._get_base_spec(name)
         leaf_shape = make_tuple(leaf[0])
         leaf_dtype = leaf[1]
@@ -277,7 +276,9 @@ class Vault:
         elif timesteps is not None:
             read_interval = (self.vault_index - timesteps, self.vault_index)
         elif percentiles is not None:
-            assert percentiles[0] < percentiles[1], "Percentiles must be in ascending order."
+            assert (
+                percentiles[0] < percentiles[1]
+            ), "Percentiles must be in ascending order."
             read_interval = (
                 int(self.vault_index * (percentiles[0] / 100)),
                 int(self.vault_index * (percentiles[1] / 100)),
@@ -288,7 +289,7 @@ class Vault:
                 read_leaf=ds,
                 read_interval=read_interval,
             ),
-            self._metadata['structure'],  # just for structure
+            self._metadata["structure"],  # just for structure
             self._all_ds,  # data stores
             is_leaf=lambda x: isinstance(x, list),
         )
