@@ -64,7 +64,7 @@ def create_item_buffer(
             to the buffer. If False, single items are being added each time add
             is called. Defaults to False.
         add_batches: (Optional[bool], optional): Whether adding data in batches to the buffer.
-            If False, single transitions or single sequences are being added each time add
+            If False, single items (or single sequences of items) are being added each time add
             is called. Defaults to False.
 
     Returns:
