@@ -54,7 +54,7 @@ def create_item_buffer(
     add_sequences: bool,
     add_batches: bool,
 ) -> TrajectoryBuffer:
-    """Creates a trajectory buffer that acts as a independent item buffer.
+    """Creates a trajectory buffer that acts as an independent item buffer.
 
     Args:
         max_length (int): The maximum length of the buffer.
