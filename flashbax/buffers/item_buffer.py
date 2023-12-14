@@ -109,7 +109,7 @@ def create_item_buffer(
     def sample_fn(
         state: TrajectoryBufferState, rng_key: PRNGKey
     ) -> TrajectoryBufferSample[Experience]:
-        """Samples a batch of transitions from the buffer."""
+        """Samples a batch of items from the buffer."""
         sampled_batch = buffer.sample(state, rng_key).experience
         sampled_batch = jax.tree_map(lambda x: x.squeeze(axis=1), sampled_batch)
         return TrajectoryBufferSample(experience=sampled_batch)
