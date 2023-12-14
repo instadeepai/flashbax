@@ -61,7 +61,7 @@ def create_item_buffer(
         min_length (int): The minimum length of the buffer.
         sample_batch_size (int): The batch size of the samples.
         add_sequences (Optional[bool], optional): Whether data is being added in sequences
-            to the buffer. If False, single transitions are being added each time add
+            to the buffer. If False, single items are being added each time add
             is called. Defaults to False.
         add_batches: (Optional[bool], optional): Whether adding data in batches to the buffer.
             If False, single transitions or single sequences are being added each time add
