@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from flashbax.buffers.flat_buffer import make_flat_buffer
+from flashbax.buffers.item_buffer import make_item_buffer
 from flashbax.buffers.prioritised_flat_buffer import make_prioritised_flat_buffer
 from flashbax.buffers.prioritised_trajectory_buffer import (
     make_prioritised_trajectory_buffer,
