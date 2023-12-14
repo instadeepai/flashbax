@@ -33,7 +33,7 @@ def validate_sample_batch_size(sample_batch_size: int, max_length: int):
 
 def validate_min_length(min_length: int, max_length: int):
     if min_length > max_length:
-        raise ValueError("min_length used is too large for the buffer size.")
+        raise ValueError("min_length used cannot be larger than max_length.")
 
 
 def validate_item_buffer_args(
