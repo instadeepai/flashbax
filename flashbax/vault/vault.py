@@ -40,11 +40,11 @@ VERSION = 0.1
 
 
 def _path_to_ds_name(path: Tuple[Union[DictKey, GetAttrKey], ...]) -> str:
-    """Utility function to convert a path (as defined by jax.tree_util.tree_map_with_path
-    to a datastore name. The alternative is to use jax.tree_util.keystr, but this has
+    """Utility function to convert a path (yielded by jax.tree_util.tree_map_with_path)
+    to a datastore name. The alternative is to use jax.tree_util.keystr(...), but this has
     different behaviour for dictionaries (DictKey) vs. namedtuples (GetAttrKey), which means
     we could not save a vault based on a namedtuple structure but later load it as a dict.
-    Instead, this maps both to a consistent string representation.
+    Instead, this function maps both to a consistent string representation.
 
     Args:
         path: tuple of DictKeys or GetAttrKeys
