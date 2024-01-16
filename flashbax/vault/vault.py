@@ -17,7 +17,7 @@ import json
 import os
 from ast import literal_eval as make_tuple
 from datetime import datetime
-from typing import Any, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -25,7 +25,7 @@ import tensorstore as ts  # type: ignore
 from chex import Array
 from etils import epath  # type: ignore
 from jax.tree_util import DictKey, GetAttrKey
-from orbax.checkpoint.utils import deserialize_tree, serialize_tree
+from orbax.checkpoint.utils import deserialize_tree, serialize_tree  # type: ignore
 
 from flashbax.buffers.trajectory_buffer import Experience, TrajectoryBufferState
 from flashbax.utils import get_tree_shape_prefix
@@ -87,7 +87,8 @@ class Vault:
                 Any additional metadata to save. Defaults to None.
 
         Raises:
-            ValueError: if the targeted vault does not exist, and no experience_structure is provided.
+            ValueError:
+                If the targeted vault does not exist, and no experience_structure is provided.
 
         Returns:
             Vault: a vault object.
@@ -113,7 +114,9 @@ class Vault:
 
             # Ensure provided metadata is json serialisable
             metadata_json_ready = jax.tree_util.tree_map(
-                lambda obj: str(obj) if not isinstance(obj, (bool, str, int, float, type(None))) else obj,
+                lambda obj: str(obj)
+                if not isinstance(obj, (bool, str, int, float, type(None)))
+                else obj,
                 metadata,
             )
 
@@ -124,10 +127,10 @@ class Vault:
                 lambda x: [str(x.shape), x.dtype.name],
                 serialize_tree(
                     # Get shape and dtype of each leaf, without serialising the structure itself
-                    jax.eval_shape( 
+                    jax.eval_shape(
                         lambda: experience_structure,
                     ),
-                )
+                ),
             )
 
             # Construct metadata
@@ -141,9 +144,11 @@ class Vault:
         else:
             # If the vault does not exist already, and no experience_structure is provided to create
             # a new vault, we cannot proceed.
-            raise ValueError("Vault does not exist and no experience_structure was provided.")
+            raise ValueError(
+                "Vault does not exist and no experience_structure was provided."
+            )
 
-        # We must now build the tree structure from the metadata, whether the metadata was created 
+        # We must now build the tree structure from the metadata, whether the metadata was created
         #  here or loaded from file
         if experience_structure is None:
             # Since the experience structure is not provided, we simply use the metadata as is.
@@ -181,7 +186,6 @@ class Vault:
         ).result()
         # Just read synchronously as it's one number
         self.vault_index = int(self._vault_index_ds.read().result()[0])
-
 
     def _get_base_spec(self, name: str) -> dict:
         """Simple common specs for all datastores.
