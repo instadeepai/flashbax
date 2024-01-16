@@ -30,13 +30,11 @@ from orbax.checkpoint.utils import deserialize_tree, serialize_tree  # type: ign
 from flashbax.buffers.trajectory_buffer import Experience, TrajectoryBufferState
 from flashbax.utils import get_tree_shape_prefix
 
-# CURRENT LIMITATIONS / TODO LIST
-# - Only tested with flat buffers
-
+# Constants
 DRIVER = "file://"
 METADATA_FILE = "metadata.json"
 TIME_AXIS_MAX_LENGTH = int(10e12)  # Upper bound on the length of the time axis
-VERSION = 0.1
+VERSION = 1.0
 
 
 def _path_to_ds_name(path: Tuple[Union[DictKey, GetAttrKey], ...]) -> str:
