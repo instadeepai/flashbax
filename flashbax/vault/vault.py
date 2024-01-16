@@ -17,13 +17,14 @@ import json
 import os
 from ast import literal_eval as make_tuple
 from datetime import datetime
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import tensorstore as ts  # type: ignore
 from chex import Array
 from etils import epath  # type: ignore
+from jax.tree_util import DictKey, GetAttrKey
 from orbax.checkpoint.utils import deserialize_tree, serialize_tree
 
 from flashbax.buffers.trajectory_buffer import Experience, TrajectoryBufferState
@@ -38,12 +39,24 @@ TIME_AXIS_MAX_LENGTH = int(10e12)  # Upper bound on the length of the time axis
 VERSION = 0.1
 
 
-def _path_to_ds_name(path: str) -> str:
+def _path_to_ds_name(path: Tuple[Union[DictKey, GetAttrKey], ...]) -> str:
+    """Utility function to convert a path (as defined by jax.tree_util.tree_map_with_path
+    to a datastore name. The alternative is to use jax.tree_util.keystr, but this has
+    different behaviour for dictionaries (DictKey) vs. namedtuples (GetAttrKey), which means
+    we could not save a vault based on a namedtuple structure but later load it as a dict.
+    Instead, this maps both to a consistent string representation.
+
+    Args:
+        path: tuple of DictKeys or GetAttrKeys
+
+    Returns:
+        str: standardised string representation of the path
+    """
     path_str = ""
     for p in path:
-        if isinstance(p, jax.tree_util.DictKey):
+        if isinstance(p, DictKey):
             path_str += str(p.key)
-        elif isinstance(p, jax.tree_util.GetAttrKey):
+        elif isinstance(p, GetAttrKey):
             path_str += p.name
         path_str += "."
     return path_str
@@ -58,8 +71,27 @@ class Vault:
         vault_uid: Optional[str] = None,
         metadata: Optional[dict] = None,
     ) -> None:
+        """Flashbax utility for storing buffers to disk efficiently.
 
-        ## ---
+        Args:
+            vault_name (str): the upper-level name of this vault.
+                Resulting path is <cwd/rel_dir/vault_name/vault_uid>.
+            experience_structure (Optional[Experience], optional):
+                Structure of the experience data, usually given as `buffer_state.experience`.
+                Defaults to None, which can only be done if reading an existing vault.
+            rel_dir (str, optional):
+                Base directory of all vaults. Defaults to "vaults".
+            vault_uid (Optional[str], optional): Unique identifier for this vault.
+                Defaults to None, which will use the current timestamp.
+            metadata (Optional[dict], optional):
+                Any additional metadata to save. Defaults to None.
+
+        Raises:
+            ValueError: if the targeted vault does not exist, and no experience_structure is provided.
+
+        Returns:
+            Vault: a vault object.
+        """
         # Get the base path for the vault and the metadata path
         vault_str = vault_uid if vault_uid else datetime.now().strftime("%Y%m%d%H%M%S")
         self._base_path = os.path.join(os.getcwd(), rel_dir, vault_name, vault_str)
@@ -79,22 +111,11 @@ class Vault:
             # Create the necessary dirs for the vault
             os.makedirs(self._base_path)
 
-            # TODO with serialize_tree?
-            def get_json_ready(obj: Any) -> Any:
-                """Ensure that the object is json serializable. Convert to string if not.
-
-                Args:
-                    obj (Any): Object to be considered
-
-                Returns:
-                    Any: json serializable object
-                """
-                if not isinstance(obj, (bool, str, int, float, type(None))):
-                    return str(obj)
-                else:
-                    return obj
-
-            metadata_json_ready = jax.tree_util.tree_map(get_json_ready, metadata)
+            # Ensure provided metadata is json serialisable
+            metadata_json_ready = jax.tree_util.tree_map(
+                lambda obj: str(obj) if not isinstance(obj, (bool, str, int, float, type(None))) else obj,
+                metadata,
+            )
 
             # We save the structure of the buffer state
             #  e.g. [(128, 100, 4), jnp.int32]
@@ -118,22 +139,25 @@ class Vault:
             # Dump metadata to file
             metadata_path.write_text(json.dumps(self._metadata))
         else:
-            raise ValueError("Vault does not exist and no init_fbx_state provided.")
+            # If the vault does not exist already, and no experience_structure is provided to create
+            # a new vault, we cannot proceed.
+            raise ValueError("Vault does not exist and no experience_structure was provided.")
 
-        ## ---
-        # We must now build the tree structure from the metadata, whether created here or loaded from file
+        # We must now build the tree structure from the metadata, whether the metadata was created 
+        #  here or loaded from file
         if experience_structure is None:
-            # If an example state is not provided, we simply load from the metadata
-            #  and the result will be a dictionary.
+            # Since the experience structure is not provided, we simply use the metadata as is.
+            #  The result will always be a dictionary.
             self._tree_structure = self._metadata["structure"]
         else:
-            # If an example state is provided, we try deserialise into that structure
+            # If experience structure is provided, we try deserialise into that structure
             self._tree_structure = deserialize_tree(
                 self._metadata["structure"],
                 target=experience_structure,
             )
 
-        # Each leaf of the fbx_state.experience maps to a data store
+        # Each leaf of the fbx_state.experience maps to a data store, so we tree map over the
+        #  tree structure to create each of the data stores.
         self._all_ds = jax.tree_util.tree_map_with_path(
             lambda path, x: self._init_leaf(
                 name=_path_to_ds_name(path),
@@ -141,7 +165,8 @@ class Vault:
                 create_ds=not base_path_exists,
             ),
             self._tree_structure,
-            is_leaf=lambda x: isinstance(x, list),  # The list [shape, dtype] is a leaf
+            # Tree structure uses a list [shape, dtype] as a leaf
+            is_leaf=lambda x: isinstance(x, list),
         )
 
         # We keep track of the last fbx buffer idx received
@@ -159,6 +184,14 @@ class Vault:
 
 
     def _get_base_spec(self, name: str) -> dict:
+        """Simple common specs for all datastores.
+
+        Args:
+            name (str): name of the datastore
+
+        Returns:
+            dict: config for the datastore
+        """
         return {
             "driver": "zarr",
             "kvstore": {
@@ -171,23 +204,37 @@ class Vault:
     def _init_leaf(
         self, name: str, leaf: list, create_ds: bool = False
     ) -> ts.TensorStore:
+        """Initialise a datastore for a leaf of the experience tree.
+
+        Args:
+            name (str): datastore name
+            leaf (list): leaf of the form ["shape", "dtype"]
+            create_ds (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            ts.TensorStore: the datastore object
+        """
         spec = self._get_base_spec(name)
-        leaf_shape = make_tuple(leaf[0])
-        leaf_dtype = leaf[1]
+        # Convert shape and dtype from str to tuple and dtype
+        leaf_shape = make_tuple(leaf[0])  # Must convert to a real tuple
+        leaf_dtype = leaf[1]  # Can leave this as a str
+
         leaf_ds = ts.open(
             spec,
-            # Only specify dtype and shape if we are creating a checkpoint
+            # Only specify dtype and shape if we are creating a vault
+            # (i.e. don't impose dtype and shape if we are _loading_ a vault)
             dtype=leaf_dtype if create_ds else None,
             shape=(
                 leaf_shape[0],  # Batch dim
-                TIME_AXIS_MAX_LENGTH,  # Time dim
-                *leaf_shape[2:],  # Experience dim
+                TIME_AXIS_MAX_LENGTH,  # Time dim, which we extend
+                *leaf_shape[2:],  # Experience dim(s)
             )
             if create_ds
-            else None,  # Don't impose shape if we are loading a vault
-            # Only create datastore if we are creating the vault
+            else None,
+            # Only create datastore if we are creating the vault:
             create=create_ds,
-        ).result()  # Synchronous
+        ).result()  # Do this synchronously
+
         return leaf_ds
 
     async def _write_leaf(
@@ -197,10 +244,19 @@ class Vault:
         source_interval: Tuple[int, int],
         dest_start: int,
     ) -> None:
+        """Asychronously write a chunk of data to a leaf's datastore.
+
+        Args:
+            source_leaf (jax.Array): the input fbx_state.experience array
+            dest_leaf (ts.TensorStore): the destination datastore
+            source_interval (Tuple[int, int]): read interval from the source leaf
+            dest_start (int): write start index in the destination leaf
+        """
         dest_interval = (
             dest_start,
-            dest_start + (source_interval[1] - source_interval[0]),  # type: ignore
+            dest_start + (source_interval[1] - source_interval[0]),
         )
+        # Write to the datastore along the time axis
         await dest_leaf[:, slice(*dest_interval), ...].write(
             source_leaf[:, slice(*source_interval), ...],
         )
@@ -211,7 +267,14 @@ class Vault:
         source_interval: Tuple[int, int],
         dest_start: int,
     ) -> None:
-        # Write to each ds
+        """Asynchronous method for writing to all the datastores.
+
+        Args:
+            fbx_state (TrajectoryBufferState): input buffer state
+            source_interval (Tuple[int, int]): read interval from the buffer state
+            dest_start (int): write start index in the vault
+        """
+        # Collect futures for writing to each datastore
         futures_tree = jax.tree_util.tree_map(
             lambda x, ds: self._write_leaf(
                 source_leaf=x,
@@ -222,6 +285,7 @@ class Vault:
             fbx_state.experience,  # x = experience
             self._all_ds,  # ds = data stores
         )
+        # Write to all datastores asynchronously
         futures, _ = jax.tree_util.tree_flatten(futures_tree)
         await asyncio.gather(*futures)
 
@@ -231,20 +295,34 @@ class Vault:
         source_interval: Tuple[int, int] = (0, 0),
         dest_start: Optional[int] = None,
     ) -> int:
-        # TODO: more than one current_index if B > 1
+        """Write any new data from the fbx buffer state to the vault.
+
+        Args:
+            fbx_state (TrajectoryBufferState): input buffer state
+            source_interval (Tuple[int, int], optional): from where to read in the buffer.
+                Defaults to (0, 0), which reads from the last received index up to the
+                current buffer state's index.
+            dest_start (Optional[int], optional): where to write in the vault.
+                Defaults to None, which writes from the current vault index.
+
+        Returns:
+            int: how many elements along the time-axis were written to the vault
+        """
         fbx_current_index = int(fbx_state.current_index)
 
-        # By default, we write from `last received` to `current index` [CI]
+        # By default, we read from `last received` to `current index`
         if source_interval == (0, 0):
             source_interval = (self._last_received_fbx_index, fbx_current_index)
+
+        # By default, we continue writing from the current vault index
+        dest_start = self.vault_index if dest_start is None else dest_start
 
         if source_interval[1] == source_interval[0]:
             # Nothing to write
             return 0
 
         elif source_interval[1] > source_interval[0]:
-            # Vanilla write, no wrap around
-            dest_start = self.vault_index if dest_start is None else dest_start
+            # Vanilla write, no wrap around in the buffer state
             asyncio.run(
                 self._write_chunk(
                     fbx_state=fbx_state,
@@ -255,14 +333,12 @@ class Vault:
             written_length = source_interval[1] - source_interval[0]
 
         elif source_interval[1] < source_interval[0]:
-            # Wrap around!
+            # Wrap around in the buffer state!
 
-            # Get dest start
-            dest_start = self.vault_index if dest_start is None else dest_start
-            # Get seq dim
+            # Get seq dim (i.e. the length of the time axis in the fbx buffer state)
             fbx_max_index = get_tree_shape_prefix(fbx_state.experience, n_axes=2)[1]
 
-            # From last received to max
+            # Read from last received fbx index to max index
             source_interval_a = (source_interval[0], fbx_max_index)
             time_length_a = source_interval_a[1] - source_interval_a[0]
 
@@ -274,7 +350,7 @@ class Vault:
                 )
             )
 
-            # From 0 (wrapped) to CI
+            # Read from the start of the fbx buffer state to the current fbx index
             source_interval_b = (0, source_interval[1])
             time_length_b = source_interval_b[1] - source_interval_b[0]
 
@@ -288,7 +364,7 @@ class Vault:
 
             written_length = time_length_a + time_length_b
 
-        # Update vault index, and write this to the ds too
+        # Update vault index, and write this to its datastore too
         self.vault_index += written_length
         self._vault_index_ds.write(self.vault_index).result()
 
@@ -302,6 +378,15 @@ class Vault:
         read_leaf: ts.TensorStore,
         read_interval: Tuple[int, int],
     ) -> Array:
+        """Read from a leaf of the experience tree.
+
+        Args:
+            read_leaf (ts.TensorStore): the datastore from which to read
+            read_interval (Tuple[int, int]): the interval on the time-axis to read
+
+        Returns:
+            Array: the read data, as a jax array
+        """
         return jnp.asarray(read_leaf[:, slice(*read_interval), ...].read().result())
 
     def read(
@@ -309,12 +394,23 @@ class Vault:
         timesteps: Optional[int] = None,
         percentiles: Optional[Tuple[int, int]] = None,
     ) -> TrajectoryBufferState:
-        """Read from the vault."""
+        """Read synchronously from the vault.
 
+        Args:
+            timesteps (Optional[int], optional): _description_. Defaults to None.
+            percentiles (Optional[Tuple[int, int]], optional): _description_. Defaults to None.
+
+        Returns:
+            TrajectoryBufferState: the read data as a fbx buffer state
+        """
+
+        # By default we read the entire vault
         if timesteps is None and percentiles is None:
             read_interval = (0, self.vault_index)
+        # If time steps are provided, we read the last `timesteps` count of elements
         elif timesteps is not None:
             read_interval = (self.vault_index - timesteps, self.vault_index)
+        # If percentiles are provided, we read the corresponding interval
         elif percentiles is not None:
             assert (
                 percentiles[0] < percentiles[1]
@@ -324,16 +420,19 @@ class Vault:
                 int(self.vault_index * (percentiles[1] / 100)),
             )
 
+        #
         read_result = jax.tree_util.tree_map(
             lambda _, ds: self._read_leaf(
                 read_leaf=ds,
                 read_interval=read_interval,
             ),
-            self._tree_structure,
-            self._all_ds,  # data stores
+            self._tree_structure,  # Just used for structure
+            self._all_ds,  # The vault data stores
+            # Interpret ["shape", "dtype"] from tree_structure as leaves:
             is_leaf=lambda x: isinstance(x, list),
         )
 
+        # Return the read result as a fbx buffer state
         return TrajectoryBufferState(
             experience=read_result,
             current_index=jnp.array(self.vault_index, dtype=int),
