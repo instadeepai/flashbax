@@ -401,8 +401,12 @@ class Vault:
         """Read synchronously from the vault.
 
         Args:
-            timesteps (Optional[int], optional): _description_. Defaults to None.
-            percentiles (Optional[Tuple[int, int]], optional): _description_. Defaults to None.
+            timesteps (Optional[int], optional):
+                If provided, we read the last `timesteps` count of elements.
+                Defaults to None.
+            percentiles (Optional[Tuple[int, int]], optional):
+                If provided (and timesteps is None) we read the corresponding interval.
+                Defaults to None.
 
         Returns:
             TrajectoryBufferState: the read data as a fbx buffer state
