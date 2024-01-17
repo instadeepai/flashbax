@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from functools import partial
 from tempfile import TemporaryDirectory
 from typing import NamedTuple
 
@@ -120,13 +121,50 @@ def test_read_from_vault(
         )
 
 
-def test_reload_vault(
+def test_extend_vault(
     fake_transition: FbxTransition,
     max_length: int,
 ):
     # Extend the vault more than the buffer size
-    n_timesteps = max_length * 5
+    n_timesteps = max_length * 10
 
+    with TemporaryDirectory() as temp_dir_path:
+        # Get the buffer pure functions
+        buffer = fbx.make_flat_buffer(
+            max_length=max_length,
+            min_length=1,
+            sample_batch_size=1,
+        )
+        buffer_add = jax.jit(buffer.add, donate_argnums=0)
+        buffer_state = buffer.init(fake_transition)  # Initialise the state
+
+        # Initialise the vault
+        v = Vault(
+            vault_name="test_vault",
+            experience_structure=buffer_state.experience,
+            rel_dir=temp_dir_path,
+        )
+
+        # Add to the vault, wrapping around the circular buffer,
+        # but writing to the vault each time we add
+        for _ in range(0, n_timesteps):
+            buffer_state = buffer_add(
+                buffer_state,
+                fake_transition,
+            )
+            v.write(buffer_state)
+
+        # Read in the full vault state --> longer than the buffer
+        long_buffer_state = v.read()
+
+        # We want to check that all the timesteps are there
+        assert long_buffer_state.experience.obs.x.shape[1] == n_timesteps
+
+
+def test_reload_vault(
+    fake_transition: FbxTransition,
+    max_length: int,
+):
     with TemporaryDirectory() as temp_dir_path:
         # Get the buffer pure functions
         buffer = fbx.make_flat_buffer(
@@ -145,11 +183,14 @@ def test_reload_vault(
             vault_uid="test_vault_uid",
         )
 
+        def multiplier(x: Array, i: int):
+            return x * i
+
         # Add to the vault
-        for _ in range(0, n_timesteps):
+        for i in range(0, max_length):
             buffer_state = buffer_add(
                 buffer_state,
-                fake_transition,
+                jax.tree_map(partial(multiplier, i=i), fake_transition),
             )
             v.write(buffer_state)
 
@@ -161,9 +202,12 @@ def test_reload_vault(
             vault_name="test_vault",
             experience_structure=buffer_state.experience,
             rel_dir=temp_dir_path,
-            vault_uid="test_vault_uid",
+            vault_uid="test_vault_uid",  # Need to pass the same UID
         )
         buffer_state_reloaded = v_reload.read()
 
-        # We want to check that all the timesteps are there
-        assert buffer_state_reloaded.experience.obs.x.shape[1] == n_timesteps
+        # We want to check that all the data is correct
+        chex.assert_trees_all_equal(
+            buffer_state.experience,
+            buffer_state_reloaded.experience,
+        )
