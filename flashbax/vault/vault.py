@@ -96,10 +96,10 @@ class Vault:
         self._base_path = os.path.join(os.getcwd(), rel_dir, vault_name, vault_str)
         metadata_path = epath.Path(os.path.join(self._base_path, METADATA_FILE))
 
-        # TODO: logging at each step
         # Check if the vault exists, otherwise create the necessary dirs and files
         base_path_exists = os.path.exists(self._base_path)
         if base_path_exists:
+            print(f"Loading vault found at {self._base_path}")
             # Vault exists, so we load the metadata to access the structure etc.
             self._metadata = json.loads(metadata_path.read_text())
 
@@ -107,6 +107,8 @@ class Vault:
             assert (self._metadata["version"] // 1) == (VERSION // 1)
 
         elif experience_structure is not None:
+            print(f"New vault created at {self._base_path}")
+
             # Create the necessary dirs for the vault
             os.makedirs(self._base_path)
 
