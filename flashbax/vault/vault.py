@@ -213,7 +213,7 @@ class Vault:
         Args:
             name (str): datastore name
             leaf (list): leaf of the form ["shape", "dtype"]
-            create_ds (bool, optional): _description_. Defaults to False.
+            create_ds (bool, optional): whether to create the datastore. Defaults to False.
 
         Returns:
             ts.TensorStore: the datastore object
