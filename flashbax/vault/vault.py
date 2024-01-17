@@ -126,7 +126,7 @@ class Vault:
             serialised_experience_structure = jax.tree_map(
                 lambda x: [str(x.shape), x.dtype.name],
                 serialize_tree(
-                    # Get shape and dtype of each leaf, without serialising the structure itself
+                    # Get shape and dtype of each leaf, without serialising the data itself
                     jax.eval_shape(
                         lambda: experience_structure,
                     ),
