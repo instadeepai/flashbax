@@ -120,21 +120,24 @@ class Vault:
                 metadata,
             )
 
-            # We save the structure of the buffer state
-            # e.g. [(128, 100, 4), jnp.int32]
-            # We will use this structure to map over the data stores later
-            serialised_experience_structure = jax.tree_map(
-                lambda x: [str(x.shape), x.dtype.name],
-                serialize_tree(
-                    # Get shape and dtype of each leaf, without serialising the data itself
-                    jax.eval_shape(lambda: experience_structure),
-                ),
+            # We save the structure of the buffer state, storing the shape and dtype of
+            # each leaf. We will use this structure to map over the data stores later.
+            # (Note: we use `jax.eval_shape` to get shape and dtype of each leaf, without
+            # unnecessarily serialising the buffer data itself)
+            serialised_experience_structure_shape = jax.tree_map(
+                lambda x: str(x.shape),
+                serialize_tree(jax.eval_shape(lambda: experience_structure)),
+            )
+            serialised_experience_structure_dtype = jax.tree_map(
+                lambda x: x.dtype.name,
+                serialize_tree(jax.eval_shape(lambda: experience_structure)),
             )
 
             # Construct metadata
             self._metadata = {
                 "version": VERSION,
-                "structure": serialised_experience_structure,
+                "structure_shape": serialised_experience_structure_shape,
+                "structure_dtype": serialised_experience_structure_dtype,
                 **(metadata_json_ready or {}),  # Allow user to save extra metadata
             }
             # Dump metadata to file
@@ -151,25 +154,32 @@ class Vault:
         if experience_structure is None:
             # Since the experience structure is not provided, we simply use the metadata as is.
             # The result will always be a dictionary.
-            self._tree_structure = self._metadata["structure"]
+            self._tree_structure_shape = self._metadata["structure_shape"]
+            self._tree_structure_dtype = self._metadata["structure_dtype"]
         else:
             # If experience structure is provided, we try deserialise into that structure
-            self._tree_structure = deserialize_tree(
-                self._metadata["structure"],
+            self._tree_structure_shape = deserialize_tree(
+                self._metadata["structure_shape"],
+                target=experience_structure,
+            )
+            self._tree_structure_dtype = deserialize_tree(
+                self._metadata["structure_dtype"],
                 target=experience_structure,
             )
 
         # Each leaf of the fbx_state.experience maps to a data store, so we tree map over the
         # tree structure to create each of the data stores.
         self._all_ds = jax.tree_util.tree_map_with_path(
-            lambda path, x: self._init_leaf(
+            lambda path, shape, dtype: self._init_leaf(
                 name=_path_to_ds_name(path),
-                leaf=x,
+                shape=make_tuple(
+                    shape
+                ),  # Must convert to a real tuple from the saved str
+                dtype=dtype,
                 create_ds=not base_path_exists,
             ),
-            self._tree_structure,
-            # Tree structure uses a list [shape, dtype] as a leaf
-            is_leaf=lambda x: isinstance(x, list),
+            self._tree_structure_shape,
+            self._tree_structure_dtype,
         )
 
         # We keep track of the last fbx buffer idx received
@@ -204,35 +214,36 @@ class Vault:
         }
 
     def _init_leaf(
-        self, name: str, leaf: list, create_ds: bool = False
+        self, name: str, shape: Tuple[int, ...], dtype: str, create_ds: bool = False
     ) -> ts.TensorStore:
         """Initialise a datastore for a leaf of the experience tree.
 
         Args:
             name (str): datastore name
-            leaf (list): leaf of the form ["shape", "dtype"]
+            shape (Tuple[int, ...]): shape of the data for this leaf
+            dtype (str): dtype of the data for this leaf
             create_ds (bool, optional): whether to create the datastore. Defaults to False.
 
         Returns:
             ts.TensorStore: the datastore object
         """
         spec = self._get_base_spec(name)
-        # Convert shape and dtype from str to tuple and dtype
-        leaf_shape = make_tuple(leaf[0])  # Must convert to a real tuple
-        leaf_dtype = leaf[1]  # Can leave this as a str
+
+        leaf_shape, leaf_dtype = None, None
+        if create_ds:
+            # Only specify dtype and shape if we are creating a vault
+            # (i.e. don't impose dtype and shape if we are _loading_ a vault)
+            leaf_shape = (
+                shape[0],  # Batch dim
+                TIME_AXIS_MAX_LENGTH,  # Time dim, which we extend
+                *shape[2:],  # Experience dim(s)
+            )
+            leaf_dtype = dtype
 
         leaf_ds = ts.open(
             spec,
-            # Only specify dtype and shape if we are creating a vault
-            # (i.e. don't impose dtype and shape if we are _loading_ a vault)
-            dtype=leaf_dtype if create_ds else None,
-            shape=(
-                leaf_shape[0],  # Batch dim
-                TIME_AXIS_MAX_LENGTH,  # Time dim, which we extend
-                *leaf_shape[2:],  # Experience dim(s)
-            )
-            if create_ds
-            else None,
+            shape=leaf_shape,
+            dtype=leaf_dtype,
             # Only create datastore if we are creating the vault:
             create=create_ds,
         ).result()  # Do this synchronously
@@ -426,16 +437,13 @@ class Vault:
                 int(self.vault_index * (percentiles[1] / 100)),
             )
 
-        #
         read_result = jax.tree_util.tree_map(
             lambda _, ds: self._read_leaf(
                 read_leaf=ds,
                 read_interval=read_interval,
             ),
-            self._tree_structure,  # Just used for structure
+            self._tree_structure_shape,  # Just used to return a valid tree structure
             self._all_ds,  # The vault data stores
-            # Interpret ["shape", "dtype"] from tree_structure as leaves:
-            is_leaf=lambda x: isinstance(x, list),
         )
 
         # Return the read result as a fbx buffer state
