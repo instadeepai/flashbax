@@ -121,15 +121,13 @@ class Vault:
             )
 
             # We save the structure of the buffer state
-            #  e.g. [(128, 100, 4), jnp.int32]
+            # e.g. [(128, 100, 4), jnp.int32]
             # We will use this structure to map over the data stores later
             serialised_experience_structure = jax.tree_map(
                 lambda x: [str(x.shape), x.dtype.name],
                 serialize_tree(
                     # Get shape and dtype of each leaf, without serialising the data itself
-                    jax.eval_shape(
-                        lambda: experience_structure,
-                    ),
+                    jax.eval_shape(lambda: experience_structure),
                 ),
             )
 
@@ -149,10 +147,10 @@ class Vault:
             )
 
         # We must now build the tree structure from the metadata, whether the metadata was created
-        #  here or loaded from file
+        # here or loaded from file
         if experience_structure is None:
             # Since the experience structure is not provided, we simply use the metadata as is.
-            #  The result will always be a dictionary.
+            # The result will always be a dictionary.
             self._tree_structure = self._metadata["structure"]
         else:
             # If experience structure is provided, we try deserialise into that structure
@@ -162,7 +160,7 @@ class Vault:
             )
 
         # Each leaf of the fbx_state.experience maps to a data store, so we tree map over the
-        #  tree structure to create each of the data stores.
+        # tree structure to create each of the data stores.
         self._all_ds = jax.tree_util.tree_map_with_path(
             lambda path, x: self._init_leaf(
                 name=_path_to_ds_name(path),
