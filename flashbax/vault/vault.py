@@ -143,6 +143,13 @@ class Vault:
             metadata_path.write_text(json.dumps(self._metadata))
 
             print(f"New vault created at {self._base_path}")
+
+            _fbx_shape = jax.tree_util.tree_leaves(experience_structure)[0].shape
+            print(
+                f"Since the provided buffer state has a temporal dimension of {_fbx_shape[1]}, "
+                f"you must write to the vault at least every {_fbx_shape[1] - 1} "
+                "timesteps to avoid data loss."
+            )
         else:
             # If the vault does not exist already, and no experience_structure is provided to create
             # a new vault, we cannot proceed.
