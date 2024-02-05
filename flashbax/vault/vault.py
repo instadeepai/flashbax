@@ -107,8 +107,6 @@ class Vault:
             assert (self._metadata["version"] // 1) == (VERSION // 1)
 
         elif experience_structure is not None:
-            print(f"New vault created at {self._base_path}")
-
             # Create the necessary dirs for the vault
             os.makedirs(self._base_path)
 
@@ -142,6 +140,8 @@ class Vault:
             }
             # Dump metadata to file
             metadata_path.write_text(json.dumps(self._metadata))
+
+            print(f"New vault created at {self._base_path}")
         else:
             # If the vault does not exist already, and no experience_structure is provided to create
             # a new vault, we cannot proceed.
