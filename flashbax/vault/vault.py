@@ -99,12 +99,13 @@ class Vault:
         # Check if the vault exists, otherwise create the necessary dirs and files
         base_path_exists = os.path.exists(self._base_path)
         if base_path_exists:
-            print(f"Loading vault found at {self._base_path}")
             # Vault exists, so we load the metadata to access the structure etc.
             self._metadata = json.loads(metadata_path.read_text())
 
             # Ensure minor versions match
             assert (self._metadata["version"] // 1) == (VERSION // 1)
+
+            print(f"Loading vault found at {self._base_path}")
 
         elif experience_structure is not None:
             # Create the necessary dirs for the vault
