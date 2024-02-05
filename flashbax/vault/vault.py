@@ -169,7 +169,7 @@ class Vault:
 
         # Each leaf of the fbx_state.experience maps to a data store, so we tree map over the
         # tree structure to create each of the data stores.
-        self._all_ds = jax.tree_util.tree_map_with_path(
+        self._all_datastores = jax.tree_util.tree_map_with_path(
             lambda path, shape, dtype: self._init_leaf(
                 name=_path_to_ds_name(path),
                 shape=make_tuple(
@@ -296,7 +296,7 @@ class Vault:
                 dest_start=dest_start,
             ),
             fbx_state.experience,  # x = experience
-            self._all_ds,  # ds = data stores
+            self._all_datastores,  # ds = data stores
         )
         # Write to all datastores asynchronously
         futures, _ = jax.tree_util.tree_flatten(futures_tree)
@@ -443,7 +443,7 @@ class Vault:
                 read_interval=read_interval,
             ),
             self._tree_structure_shape,  # Just used to return a valid tree structure
-            self._all_ds,  # The vault data stores
+            self._all_datastores,  # The vault data stores
         )
 
         # Return the read result as a fbx buffer state
