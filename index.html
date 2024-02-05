@@ -411,6 +411,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#vault" class="md-nav__link">
+    Vault 💾
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#important-considerations" class="md-nav__link">
     Important Considerations ⚠️
   </a>
@@ -449,6 +456,13 @@
           <li class="md-nav__item">
   <a href="#in-place-updating-of-buffer-state" class="md-nav__link">
     In-place Updating of Buffer State
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storing-data-with-vault" class="md-nav__link">
+    Storing Data with Vault
   </a>
   
 </li>
@@ -967,6 +981,9 @@ from CleanRLs DQN JAX example.</li>
 <li>🦎 <a href="https://github.com/instadeepai/jumanji/">Jumanji</a> - utilise Jumanji's JAX based environments
 like Snake for our fully jitted examples.</li>
 </ul>
+<h2 id="vault">Vault 💾<a class="headerlink" href="#vault" title="Permanent link">#</a></h2>
+<p>Vault is an efficient mechanism for saving Flashbax buffers to persistent data storage, e.g. for use in offline reinforcement learning. Consider a Flashbax buffer which has experience data of dimensionality $(B, T, <em>E)$, where $B$ is a batch dimension (for the sake of recording independent trajectories synchronously), $T$ is a temporal/sequential dimension, and $</em>E$ indicates the one or more dimensions of the experience data itself. Since large quantities of data may be generated for a given environment, Vault extends the $T$ dimension to a virtually unconstrained degree by reading and writing slices of buffers along this temporal axis. In doing so, gigantic buffer stores can reside on disk, from which sub-buffers can be loaded into RAM/VRAM for efficient offline training. Vault has been tested with the item, flat, and trajectory buffers.</p>
+<p>For more information, see the demonstrative notebook: <a href="https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/vault_demonstration.ipynb"><img alt="Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
 <h2 id="important-considerations">Important Considerations ⚠️<a class="headerlink" href="#important-considerations" title="Permanent link">#</a></h2>
 <p>When working with Flashbax buffers, it's crucial to be mindful of certain considerations to ensure the proper functionality of your RL agent.</p>
 <h3 id="sequential-data-addition">Sequential Data Addition<a class="headerlink" href="#sequential-data-addition" title="Permanent link">#</a></h3>
@@ -1010,6 +1027,8 @@ like Snake for our fully jitted examples.</li>
 <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
 <p>It is important to include <code>donate_argnums</code> when calling <code>jax.jit</code> to enable JAX to perform an in-place update of the replay buffer state. Omitting <code>donate_argnums</code> would force JAX to create a copy of the state for any modifications to the replay buffer state, potentially negating all performance benefits. More information about buffer donation in JAX can be found in the <a href="https://jax.readthedocs.io/en/latest/faq.html#buffer-donation">documentation</a>.</p>
+<h3 id="storing-data-with-vault">Storing Data with Vault<a class="headerlink" href="#storing-data-with-vault" title="Permanent link">#</a></h3>
+<p>As mentioned <a href="../README.md#vault-💾">above</a>, Vault stores experience data to disk by extending the temporal axis of a Flashbax buffer state. By default, Vault conveniently handles the bookkeeping of this process: consuming a buffer state and saving any fresh, previously unseen data. e.g. Suppose we write 10 timesteps to our Flashbax buffer, and then save this state to a Vault; since all of this data is fresh, all of it will be written to disk. However, if we then write one more timestep and save the state to the Vault, only that new timestep will be written, preventing any duplication of data that has already been saved. Importantly, one must remember that Flashbax states are implemented as <em>ring buffers</em>, meaning the Vault must be updated sufficiently frequently before unseen data in the Flashbax buffer state is overwritten. i.e. If our buffer state has a time-axis length of $\tau$, then we must save to the vault every $\tau - 1$ steps, lest we overwrite (and lose) unsaved data.</p>
 <p>In summary, understanding and addressing these considerations will help you navigate potential pitfalls and ensure the effectiveness of your reinforcement learning strategies while utilising Flashbax buffers.</p>
 <h2 id="benchmarks">Benchmarks 📈<a class="headerlink" href="#benchmarks" title="Permanent link">#</a></h2>
 <p>Here we provide a series of initial benchmarks outlining the performance of the various Flashbax buffers compared against commonly used open-source buffers. In these benchmarks we (unless explicitly stated otherwise) use the following configuration:</p>

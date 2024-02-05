@@ -2,32 +2,32 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://instadeepai.github.io/flashbax/</loc>
-         <lastmod>2023-12-14</lastmod>
+         <lastmod>2024-02-05</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://instadeepai.github.io/flashbax/api/flat_buffer/</loc>
-         <lastmod>2023-12-14</lastmod>
+         <lastmod>2024-02-05</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://instadeepai.github.io/flashbax/api/prioritised_flat_buffer/</loc>
-         <lastmod>2023-12-14</lastmod>
+         <lastmod>2024-02-05</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://instadeepai.github.io/flashbax/api/prioritised_trajectory_buffer/</loc>
-         <lastmod>2023-12-14</lastmod>
+         <lastmod>2024-02-05</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://instadeepai.github.io/flashbax/api/trajectory_buffer/</loc>
-         <lastmod>2023-12-14</lastmod>
+         <lastmod>2024-02-05</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://instadeepai.github.io/flashbax/api/trajectory_queue/</loc>
-         <lastmod>2023-12-14</lastmod>
+         <lastmod>2024-02-05</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>

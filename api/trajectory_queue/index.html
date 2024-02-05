@@ -649,7 +649,7 @@ for trajectories to be sampled - by slicing consecutive sequences along the time
     </thead>
     <tbody>
         <tr>
-          <td><code>init</code></td>
+          <td><code><span title="flashbax.buffers.trajectory_queue.TrajectoryQueue.init">init</span></code></td>
           <td>
                 <code><span title="typing.Callable">Callable</span>[[<span title="flashbax.buffers.trajectory_queue.Experience">Experience</span>], <span title="flashbax.buffers.trajectory_queue.TrajectoryQueueState">TrajectoryQueueState</span>[<span title="flashbax.buffers.trajectory_queue.Experience">Experience</span>]]</code>
           </td>
@@ -661,7 +661,7 @@ timestep (e.g. (s,a,r)).</p>
           </td>
         </tr>
         <tr>
-          <td><code>add</code></td>
+          <td><code><span title="flashbax.buffers.trajectory_queue.TrajectoryQueue.add">add</span></code></td>
           <td>
                 <code><span title="typing.Callable">Callable</span>[[<span title="flashbax.buffers.trajectory_queue.TrajectoryQueueState">TrajectoryQueueState</span>[<span title="flashbax.buffers.trajectory_queue.Experience">Experience</span>], <span title="flashbax.buffers.trajectory_queue.Experience">Experience</span>], <span title="flashbax.buffers.trajectory_queue.TrajectoryQueueState">TrajectoryQueueState</span>[<span title="flashbax.buffers.trajectory_queue.Experience">Experience</span>]]</code>
           </td>
@@ -672,7 +672,7 @@ timestep (e.g. (s,a,r)).</p>
           </td>
         </tr>
         <tr>
-          <td><code>sample</code></td>
+          <td><code><span title="flashbax.buffers.trajectory_queue.TrajectoryQueue.sample">sample</span></code></td>
           <td>
                 <code><span title="typing.Callable">Callable</span>[[<span title="flashbax.buffers.trajectory_queue.TrajectoryQueueState">TrajectoryQueueState</span>[<span title="flashbax.buffers.trajectory_queue.Experience">Experience</span>]], <span title="typing.Tuple">Tuple</span>[<span title="flashbax.buffers.trajectory_queue.TrajectoryQueueState">TrajectoryQueueState</span>, <span title="flashbax.buffers.trajectory_queue.TrajectoryQueueSample">TrajectoryQueueSample</span>[<span title="flashbax.buffers.trajectory_queue.Experience">Experience</span>]]]</code>
           </td>
@@ -687,7 +687,7 @@ the state using the <code>add</code> function.</p>
           </td>
         </tr>
         <tr>
-          <td><code>can_sample</code></td>
+          <td><code><span title="flashbax.buffers.trajectory_queue.TrajectoryQueue.can_sample">can_sample</span></code></td>
           <td>
                 <code><span title="typing.Callable">Callable</span>[[<span title="flashbax.buffers.trajectory_queue.TrajectoryQueueState">TrajectoryQueueState</span>[<span title="flashbax.buffers.trajectory_queue.Experience">Experience</span>]], <span title="jax.Array">Array</span>]</code>
           </td>
@@ -698,7 +698,7 @@ the state using the <code>add</code> function.</p>
           </td>
         </tr>
         <tr>
-          <td><code>can_add</code></td>
+          <td><code><span title="flashbax.buffers.trajectory_queue.TrajectoryQueue.can_add">can_add</span></code></td>
           <td>
                 <code><span title="typing.Callable">Callable</span>[[<span title="flashbax.buffers.trajectory_queue.TrajectoryQueueState">TrajectoryQueueState</span>[<span title="flashbax.buffers.trajectory_queue.Experience">Experience</span>]], <span title="jax.Array">Array</span>]</code>
           </td>
@@ -730,6 +730,7 @@ the state using the <code>add</code> function.</p>
   </div>
 
   </div>
+
 
 </div>
 

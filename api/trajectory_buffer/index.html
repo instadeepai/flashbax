@@ -651,7 +651,7 @@ for trajectories to be sampled - by slicing consecutive sequences along the time
     </thead>
     <tbody>
         <tr>
-          <td><code>init</code></td>
+          <td><code><span title="flashbax.buffers.trajectory_buffer.TrajectoryBuffer.init">init</span></code></td>
           <td>
                 <code><span title="typing.Callable">Callable</span>[[<span title="flashbax.buffers.trajectory_buffer.Experience">Experience</span>], <span title="flashbax.buffers.trajectory_buffer.BufferState">BufferState</span>]</code>
           </td>
@@ -663,7 +663,7 @@ timestep (e.g. (s,a,r)).</p>
           </td>
         </tr>
         <tr>
-          <td><code>add</code></td>
+          <td><code><span title="flashbax.buffers.trajectory_buffer.TrajectoryBuffer.add">add</span></code></td>
           <td>
                 <code><span title="typing.Callable">Callable</span>[[<span title="flashbax.buffers.trajectory_buffer.BufferState">BufferState</span>, <span title="flashbax.buffers.trajectory_buffer.Experience">Experience</span>], <span title="flashbax.buffers.trajectory_buffer.BufferState">BufferState</span>]</code>
           </td>
@@ -674,7 +674,7 @@ timestep (e.g. (s,a,r)).</p>
           </td>
         </tr>
         <tr>
-          <td><code>sample</code></td>
+          <td><code><span title="flashbax.buffers.trajectory_buffer.TrajectoryBuffer.sample">sample</span></code></td>
           <td>
                 <code><span title="typing.Callable">Callable</span>[[<span title="flashbax.buffers.trajectory_buffer.BufferState">BufferState</span>, <span title="chex.PRNGKey">PRNGKey</span>], <span title="flashbax.buffers.trajectory_buffer.BufferSample">BufferSample</span>]</code>
           </td>
@@ -688,7 +688,7 @@ data added to the state using the <code>add</code> function.</p>
           </td>
         </tr>
         <tr>
-          <td><code>can_sample</code></td>
+          <td><code><span title="flashbax.buffers.trajectory_buffer.TrajectoryBuffer.can_sample">can_sample</span></code></td>
           <td>
                 <code><span title="typing.Callable">Callable</span>[[<span title="flashbax.buffers.trajectory_buffer.BufferState">BufferState</span>], <span title="jax.Array">Array</span>]</code>
           </td>
@@ -722,6 +722,7 @@ number of trajectories added to the buffer state is greater than or equal to the
   </div>
 
   </div>
+
 
 </div>
 
