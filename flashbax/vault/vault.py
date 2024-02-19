@@ -34,7 +34,11 @@ from flashbax.utils import get_tree_shape_prefix
 DRIVER = "file://"
 METADATA_FILE = "metadata.json"
 TIME_AXIS_MAX_LENGTH = int(10e12)  # Upper bound on the length of the time axis
-VERSION = 1.0
+COMPRESSION_DEFAULT = {
+    "id": "gzip",
+    "level": 5,
+}
+VERSION = 1.1
 
 
 def _path_to_ds_name(path: Tuple[Union[DictKey, GetAttrKey], ...]) -> str:
@@ -61,12 +65,13 @@ def _path_to_ds_name(path: Tuple[Union[DictKey, GetAttrKey], ...]) -> str:
 
 
 class Vault:
-    def __init__(
+    def __init__(  # noqa: CCR001
         self,
         vault_name: str,
         experience_structure: Optional[Experience] = None,
         rel_dir: str = "vaults",
         vault_uid: Optional[str] = None,
+        compression: Optional[dict] = None,
         metadata: Optional[dict] = None,
     ) -> None:
         """Flashbax utility for storing buffers to disk efficiently.
@@ -81,6 +86,9 @@ class Vault:
                 Base directory of all vaults. Defaults to "vaults".
             vault_uid (Optional[str], optional): Unique identifier for this vault.
                 Defaults to None, which will use the current timestamp.
+            compression (Optional[dict], optional):
+                Compression settings for the vault. Defaults to None, which will use
+                the default settings.
             metadata (Optional[dict], optional):
                 Any additional metadata to save. Defaults to None.
 
@@ -137,6 +145,7 @@ class Vault:
                 "version": VERSION,
                 "structure_shape": serialised_experience_structure_shape,
                 "structure_dtype": serialised_experience_structure_dtype,
+                "compression": compression or COMPRESSION_DEFAULT,
                 **(metadata_json_ready or {}),  # Allow user to save extra metadata
             }
             # Dump metadata to file
@@ -174,6 +183,13 @@ class Vault:
                 self._metadata["structure_dtype"],
                 target=experience_structure,
             )
+
+        # Load compression settings from metadata
+        self._compression = (
+            self._metadata["compression"]
+            if "compression" in self._metadata
+            else COMPRESSION_DEFAULT
+        )
 
         # Each leaf of the fbx_state.experience maps to a data store, so we tree map over the
         # tree structure to create each of the data stores.
@@ -218,6 +234,11 @@ class Vault:
                 "driver": "ocdbt",
                 "base": f"{DRIVER}{self._base_path}",
                 "path": name,
+            },
+            "metadata": {
+                "compressor": {
+                    **self._compression,
+                }
             },
         }
 
