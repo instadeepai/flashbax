@@ -206,6 +206,11 @@ class Vault:
             self._tree_structure_dtype,
         )
 
+        # Recover the length of the buffer state's time axis from the metadata
+        self._buffer_time_axis_len = jax.tree_util.tree_flatten(
+            jax.tree_map(lambda x: make_tuple(x), self._metadata["structure_shape"])
+        )[0][1]
+
         # We keep track of the last fbx buffer idx received
         self._last_received_fbx_index = 0
 
@@ -440,10 +445,12 @@ class Vault:
 
         Args:
             timesteps (Optional[int], optional):
-                If provided, we read the last `timesteps` count of elements.
+                If provided, we read the last `timesteps` count of elements, and we return
+                a full buffer containing the read data.
                 Defaults to None.
             percentiles (Optional[Tuple[int, int]], optional):
-                If provided (and timesteps is None) we read the corresponding interval.
+                If provided (and timesteps is None) we read the corresponding interval, and
+                we return a full buffer containing the read data.
                 Defaults to None.
 
         Returns:
@@ -452,12 +459,36 @@ class Vault:
 
         # By default we read the entire vault
         if timesteps is None and percentiles is None:
-            read_interval = (0, self.vault_index)
+            # If the vault is bigger than the original fbx buffer, we read the whole
+            # vault and return a *full* buffer state.
+            # Otherwise, we still read the whole vault but return a buffer state of
+            # size equal to the original fbx buffer
+            read_interval = (
+                0,
+                max(
+                    (
+                        self._buffer_time_axis_len,
+                        self.vault_index,
+                    )
+                ),
+            )
+            read_buffer_is_full = self.vault_index >= self._buffer_time_axis_len
+            read_buffer_index = self.vault_index
         # If time steps are provided, we read the last `timesteps` count of elements
         elif timesteps is not None:
+            assert timesteps > 0 and timesteps <= self.vault_index, (
+                "timesteps must be a positive integer, "
+                f"less than or equal to the current vault index ({self.vault_index})."
+            )
             read_interval = (self.vault_index - timesteps, self.vault_index)
+            # If timesteps are provided, we always return a full buffer state
+            read_buffer_is_full = True
+            read_buffer_index = timesteps
         # If percentiles are provided, we read the corresponding interval
         elif percentiles is not None:
+            assert (
+                percentiles[0] >= 0 and percentiles[1] >= 0
+            ), "Percentiles must be positive integers."
             assert (
                 percentiles[0] < percentiles[1]
             ), "Percentiles must be in ascending order."
@@ -465,7 +496,11 @@ class Vault:
                 int(self.vault_index * (percentiles[0] / 100)),
                 int(self.vault_index * (percentiles[1] / 100)),
             )
+            # If percentiles are provided, we always return a full buffer state
+            read_buffer_is_full = True
+            read_buffer_index = read_interval[1] - read_interval[0]
 
+        # Read the vault
         read_result = jax.tree_util.tree_map(
             lambda _, ds: self._read_leaf(
                 read_leaf=ds,
@@ -478,6 +513,6 @@ class Vault:
         # Return the read result as a fbx buffer state
         return TrajectoryBufferState(
             experience=read_result,
-            current_index=jnp.array(self.vault_index, dtype=int),
-            is_full=jnp.array(True, dtype=bool),
+            current_index=jnp.array(read_buffer_index, dtype=int),
+            is_full=jnp.array(read_buffer_is_full, dtype=bool),
         )
