@@ -13,8 +13,9 @@
 # limitations under the License.
 
 import warnings
-from typing import TYPE_CHECKING, Generic, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Generic, Optional
 
+import chex
 from chex import PRNGKey
 from typing_extensions import NamedTuple
 
@@ -63,32 +64,47 @@ def validate_max_length_add_batch_size(max_length: int, add_batch_size: int):
         )
 
 
-def validate_flat_buffer_args(
+def validate_n_step(n_step: int, max_length: int):
+    if n_step >= max_length:
+        raise ValueError(
+            f"""n_step must be less than max_length. It is currently
+            {n_step} >= {max_length}"""
+        )
+
+
+def validate_n_step_buffer_args(
     max_length: int,
     min_length: int,
     sample_batch_size: int,
     add_batch_size: int,
+    n_step: int,
 ):
-    """Validates the arguments for the flat buffer."""
+    """Validates the arguments for the n-step buffer."""
 
     validate_sample_batch_size(sample_batch_size, max_length)
     validate_min_length(min_length, add_batch_size, max_length)
     validate_max_length_add_batch_size(max_length, add_batch_size)
+    validate_n_step(n_step, max_length)
 
 
-def create_flat_buffer(
+def create_n_step_buffer(
     max_length: int,
     min_length: int,
     sample_batch_size: int,
     add_sequences: bool,
     add_batch_size: Optional[int],
+    n_step: int,
+    n_step_functional_map: Optional[
+        Dict[str, Callable[[chex.Array], chex.Array]]
+    ] = None,
 ) -> TrajectoryBuffer:
-    """Creates a trajectory buffer that acts as a flat buffer.
+    """Creates a trajectory buffer that acts as a n-step buffer.
 
     Args:
         max_length (int): The maximum length of the buffer.
         min_length (int): The minimum length of the buffer.
         sample_batch_size (int): The batch size of the samples.
+        n_step (int): The number of steps to use for the n-step buffer.
         add_sequences (Optional[bool], optional): Whether data is being added in sequences
             to the buffer. If False, single transitions are being added each time add
             is called. Defaults to False.
@@ -106,11 +122,12 @@ def create_flat_buffer(
     else:
         add_batches = True
 
-    validate_flat_buffer_args(
+    validate_n_step_buffer_args(
         max_length=max_length,
         min_length=min_length,
         sample_batch_size=sample_batch_size,
         add_batch_size=add_batch_size,
+        n_step=n_step,
     )
 
     with warnings.catch_warnings():
@@ -127,7 +144,7 @@ def create_flat_buffer(
             min_length_time_axis=min_length // add_batch_size + 1,
             add_batch_size=add_batch_size,
             sample_batch_size=sample_batch_size,
-            sample_sequence_length=2,
+            sample_sequence_length=n_step + 1,
             period=1,
             max_size=max_length,
         )
@@ -147,41 +164,73 @@ def create_flat_buffer(
 
     def sample_fn(state: TrajectoryBufferState, rng_key: PRNGKey) -> TransitionSample:
         """Samples a batch of transitions from the buffer."""
-        sampled_batch = buffer.sample(state, rng_key).experience
-        first = jax.tree_util.tree_map(lambda x: x[:, 0], sampled_batch)
-        second = jax.tree_util.tree_map(lambda x: x[:, 1], sampled_batch)
+        sampled_n_step_sequence_item = buffer.sample(state, rng_key).experience
+        if n_step_functional_map is not None:
+            item_type_dict_mapper = n_step_functional_map.pop("dict_mapper", dict)
+            experience_type = type(sampled_n_step_sequence_item)
+            sampled_n_step_sequence_dict = item_type_dict_mapper(
+                sampled_n_step_sequence_item
+            )
+            for key, fun in n_step_functional_map.items():
+                sampled_n_step_sequence_dict[key] = jax.tree_util.tree_map(
+                    fun, sampled_n_step_sequence_dict[key]
+                )
+            sampled_n_step_sequence_item = experience_type(
+                **sampled_n_step_sequence_dict
+            )
+        first = jax.tree_util.tree_map(lambda x: x[:, 0], sampled_n_step_sequence_item)
+        second = jax.tree_util.tree_map(
+            lambda x: x[:, -1], sampled_n_step_sequence_item
+        )
         return TransitionSample(experience=ExperiencePair(first=first, second=second))
 
     return buffer.replace(add=add_fn, sample=sample_fn)  # type: ignore
 
 
-def make_flat_buffer(
+def make_n_step_buffer(
     max_length: int,
     min_length: int,
     sample_batch_size: int,
+    n_step: int = 1,
     add_sequences: bool = False,
     add_batch_size: Optional[int] = None,
+    n_step_functional_map: Optional[
+        Dict[str, Callable[[chex.Array], chex.Array]]
+    ] = None,
 ) -> TrajectoryBuffer:
-    """Makes a trajectory buffer act as a flat buffer.
+    """Makes a trajectory buffer act as a n-step buffer.
 
     Args:
         max_length (int): The maximum length of the buffer.
         min_length (int): The minimum length of the buffer.
         sample_batch_size (int): The batch size of the samples.
+        n_step (int): The number of steps to use for the n-step buffer.
         add_sequences (Optional[bool], optional): Whether data is being added in sequences
             to the buffer. If False, single transitions are being added each time add
             is called. Defaults to False.
         add_batch_size (Optional[int], optional): If adding data in batches, what is the
             batch size that is being added each time. If None, single transitions or single
             sequences are being added each time add is called. Defaults to None.
+        n_step_functional_map (Optional[Dict[str, Callable[[chex.Array], chex.Array]]], optional):
+            A dictionary of functions to apply to the n-step transitions. The keys are the names of
+            the data attributes and the values are the functions to apply. Each function takes in a
+            sequence of n+1 data items and returns a sequence of n+1 data items. However, only the
+            first and last value of the sequence are used and placed into first and second
+            respectively. If the dictionary has a key 'dict_mapper' then the value is a function
+            that takes in the batch data and returns a dictionary. This function is used to map the
+            data type that to a dictionary. For dictionaries and chex.dataclasses this does not need
+            to be set but for flax structs and named tuples this needs to be set accordingly. Only
+            data attributes that are in the dictionary are modified.
 
     Returns:
         The buffer."""
 
-    return create_flat_buffer(
+    return create_n_step_buffer(
         max_length=max_length,
         min_length=min_length,
         sample_batch_size=sample_batch_size,
+        n_step=n_step,
         add_sequences=add_sequences,
         add_batch_size=add_batch_size,
+        n_step_functional_map=n_step_functional_map,
     )

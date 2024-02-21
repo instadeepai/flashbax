@@ -1,4 +1,4 @@
-::: flashbax.buffers.flat_buffer
+::: flashbax.buffers.n_step_buffer
     options:
         members:
-            - make_flat_buffer
+            - make_n_step_buffer

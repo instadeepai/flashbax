@@ -20,8 +20,8 @@ nav:
       - Buffers:
           - Trajectory Buffer: api/trajectory_buffer.md
           - Prioritised Trajectory Buffer: api/prioritised_trajectory_buffer.md
-          - Flat Buffer: api/flat_buffer.md
-          - Prioritised Flat Buffer: api/prioritised_flat_buffer.md
+          - Flat Buffer: api/n_step_buffer.md
+          - Prioritised Flat Buffer: api/prioritised_n_step_buffer.md
           - Trajectory Queue: api/trajectory_queue.md
 
 # Configuration

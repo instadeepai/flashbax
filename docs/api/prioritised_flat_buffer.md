@@ -1,4 +1,4 @@
-::: flashbax.buffers.prioritised_flat_buffer
+::: flashbax.buffers.prioritised_n_step_buffer
     options:
         members:
-            - make_prioritised_flat_buffer
+            - make_prioritised_n_step_buffer

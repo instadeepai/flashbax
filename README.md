@@ -74,9 +74,9 @@ buffer = fbx.make_trajectory_buffer(...)
 # OR
 buffer = fbx.make_prioritised_trajectory_buffer(...)
 # OR
-buffer = fbx.make_flat_buffer(...)
+buffer = fbx.make_n_step_buffer(...)
 # OR
-buffer = fbx.make_prioritised_flat_buffer(...)
+buffer = fbx.make_prioritised_n_step_buffer(...)
 # OR
 buffer = fbx.make_item_buffer(...)
 # OR
@@ -99,9 +99,9 @@ import jax
 import jax.numpy as jnp
 import flashbax as fbx
 
-# Instantiate the flat buffer NamedTuple using `make_flat_buffer` using a simple configuration.
+# Instantiate the flat buffer NamedTuple using `make_n_step_buffer` using a simple configuration.
 # The returned `buffer` is simply a container for the pure functions needed for using a flat buffer.
-buffer = fbx.make_flat_buffer(max_length=32, min_length=2, sample_batch_size=1)
+buffer = fbx.make_n_step_buffer(max_length=32, min_length=2, sample_batch_size=1)
 
 # Initialise the buffer's state.
 fake_timestep = {"obs": jnp.array([0, 0]), "reward": jnp.array(0.0)}
@@ -133,9 +133,9 @@ We provide the following Colab examples for a more advanced tutorial on how to u
 
 | Colab Notebook | Description |
 |----------------|-------------|
-| [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_flat_buffer.ipynb) | Flat Buffer Quickstart|
+| [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_n_step_buffer.ipynb) | Flat Buffer Quickstart|
 | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_trajectory_buffer.ipynb) | Trajectory Buffer Quickstart|
-| [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_prioritised_flat_buffer.ipynb) | Prioritised Flat Buffer Quickstart|
+| [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_prioritised_n_step_buffer.ipynb) | Prioritised Flat Buffer Quickstart|
 | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/anakin_dqn_example.ipynb) | Anakin DQN |
 | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/anakin_prioritised_dqn_example.ipynb) | Anakin Prioritised DQN |
 | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/anakin_ppo_example.ipynb) | Anakin PPO |

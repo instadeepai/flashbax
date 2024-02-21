@@ -59,7 +59,7 @@ def test_write_to_vault(
 ):
     with TemporaryDirectory() as temp_dir_path:
         # Get the buffer pure functions
-        buffer = fbx.make_flat_buffer(
+        buffer = fbx.make_n_step_buffer(
             max_length=max_length,
             min_length=1,
             sample_batch_size=1,
@@ -90,7 +90,7 @@ def test_read_from_vault(
 ):
     with TemporaryDirectory() as temp_dir_path:
         # Get the buffer pure functions
-        buffer = fbx.make_flat_buffer(
+        buffer = fbx.make_n_step_buffer(
             max_length=max_length,
             min_length=1,
             sample_batch_size=1,
@@ -130,7 +130,7 @@ def test_extend_vault(
 
     with TemporaryDirectory() as temp_dir_path:
         # Get the buffer pure functions
-        buffer = fbx.make_flat_buffer(
+        buffer = fbx.make_n_step_buffer(
             max_length=max_length,
             min_length=1,
             sample_batch_size=1,
@@ -167,7 +167,7 @@ def test_reload_vault(
 ):
     with TemporaryDirectory() as temp_dir_path:
         # Get the buffer pure functions
-        buffer = fbx.make_flat_buffer(
+        buffer = fbx.make_n_step_buffer(
             max_length=max_length,
             min_length=1,
             sample_batch_size=1,

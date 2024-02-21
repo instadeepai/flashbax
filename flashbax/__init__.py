@@ -13,16 +13,14 @@
 # limitations under the License.
 
 
-from flashbax.buffers import (
-    flat_buffer,
+from flashbax.buffers import (  # make_prioritised_n_step_buffer,; prioritised_n_step_buffer,
     item_buffer,
-    make_flat_buffer,
     make_item_buffer,
-    make_prioritised_flat_buffer,
+    make_n_step_buffer,
     make_prioritised_trajectory_buffer,
     make_trajectory_buffer,
     make_trajectory_queue,
-    prioritised_flat_buffer,
+    n_step_buffer,
     prioritised_trajectory_buffer,
     trajectory_buffer,
     trajectory_queue,

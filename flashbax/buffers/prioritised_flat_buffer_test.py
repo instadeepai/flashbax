@@ -19,7 +19,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from flashbax.buffers import prioritised_flat_buffer, sum_tree
+from flashbax.buffers import prioritised_n_step_buffer, sum_tree
 from flashbax.buffers.conftest import get_fake_batch
 from flashbax.conftest import _DEVICE_COUNT_MOCK
 
@@ -41,7 +41,7 @@ def test_add_and_can_sample(
     the way to the max_length and checking that it produces the expected behaviour .
     """
     fake_batch = get_fake_batch(fake_transition, add_batch_size)
-    buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
+    buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
         max_length,
         min_length,
         sample_batch_size,
@@ -89,7 +89,7 @@ def test_sample(
     # Fill buffer to the point that we can sample
     fake_batch = get_fake_batch(fake_transition, add_batch_size)
 
-    buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
+    buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
         max_length, min_length, sample_batch_size, False, add_batch_size
     )
     state = buffer.init(fake_transition)
@@ -135,7 +135,7 @@ def test_adjust_priorities(
     add_batch_size = int(min_length + 10)
     # Fill buffer to the point that we can sample.
     fake_batch = get_fake_batch(fake_transition, add_batch_size)
-    buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
+    buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
         max_length,
         min_length,
         sample_batch_size,
@@ -165,7 +165,7 @@ def test_adjust_priorities(
     ).all()
 
 
-def test_prioritised_flat_buffer_does_not_smoke(
+def test_prioritised_n_step_buffer_does_not_smoke(
     fake_transition: chex.ArrayTree,
     min_length: int,
     max_length: int,
@@ -177,7 +177,7 @@ def test_prioritised_flat_buffer_does_not_smoke(
 
     add_batch_size = int(min_length + 5)
 
-    buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
+    buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
         max_length,
         min_length,
         sample_batch_size,
@@ -234,7 +234,7 @@ def test_add_batch_size_none(
         lambda x: jnp.squeeze(x, 0), get_fake_batch(fake_transition, 1)
     )
 
-    buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
+    buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
         max_length,
         min_length,
         sample_batch_size,
@@ -284,7 +284,7 @@ def test_add_sequences(
     )
     assert fake_batch["obs"].shape[0] == add_sequence_size
 
-    buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
+    buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
         max_length,
         min_length,
         sample_batch_size,
@@ -327,7 +327,7 @@ def test_add_sequences_and_batches(
     )
     assert fake_batch["obs"].shape[:2] == (add_batch_size, add_sequence_size)
 
-    buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
+    buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
         max_length,
         min_length,
         sample_batch_size,

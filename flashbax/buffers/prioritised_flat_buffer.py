@@ -17,10 +17,10 @@ from typing import TYPE_CHECKING, Optional
 
 from chex import PRNGKey
 
-from flashbax.buffers.flat_buffer import (
+from flashbax.buffers.n_step_buffer import (
     ExperiencePair,
     TransitionSample,
-    validate_flat_buffer_args,
+    validate_n_step_buffer_args,
 )
 from flashbax.buffers.prioritised_trajectory_buffer import (
     Indices,
@@ -55,7 +55,7 @@ def validate_priority_exponent(priority_exponent: float) -> None:
         )
 
 
-def make_prioritised_flat_buffer(
+def make_prioritised_n_step_buffer(
     max_length: int,
     min_length: int,
     sample_batch_size: int,
@@ -91,7 +91,7 @@ def make_prioritised_flat_buffer(
         add_batches = True
 
     validate_priority_exponent(priority_exponent)
-    validate_flat_buffer_args(
+    validate_n_step_buffer_args(
         max_length=max_length,
         min_length=min_length,
         sample_batch_size=sample_batch_size,
