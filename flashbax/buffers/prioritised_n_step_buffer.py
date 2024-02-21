@@ -13,13 +13,15 @@
 # limitations under the License.
 
 import warnings
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple
 
+import chex
 from chex import PRNGKey
 
 from flashbax.buffers.n_step_buffer import (
     ExperiencePair,
     TransitionSample,
+    perform_n_step_functional_map,
     validate_n_step_buffer_args,
 )
 from flashbax.buffers.prioritised_trajectory_buffer import (
@@ -59,10 +61,14 @@ def make_prioritised_n_step_buffer(
     max_length: int,
     min_length: int,
     sample_batch_size: int,
+    n_step: int = 1,
     add_sequences: bool = False,
     add_batch_size: Optional[int] = None,
     priority_exponent: float = 0.6,
     device: str = "cpu",
+    n_step_functional_map: Optional[
+        Dict[Tuple[str, ...], Callable[[chex.Array], chex.Array]]
+    ] = None,
 ) -> PrioritisedTrajectoryBuffer:
     """Makes a prioritised trajectory buffer act as a prioritised flat buffer.
 
@@ -70,6 +76,7 @@ def make_prioritised_n_step_buffer(
         max_length (int): The maximum length of the buffer.
         min_length (int): The minimum length of the buffer.
         sample_batch_size (int): The batch size of the samples.
+        n_step (int): The number of steps to use for the n-step buffer.
         add_sequences (Optional[bool], optional): Whether data is being added in sequences
             to the buffer. If False, single transitions are being added each time add
             is called. Defaults to False.
@@ -79,6 +86,19 @@ def make_prioritised_n_step_buffer(
         priority_exponent (float, optional): The exponent to use when calculating priorities.
             Defaults to 0.6.
         device (str): Depending on desired backend - more optimised functions are selected.
+        n_step_functional_map (Optional[Dict[Tuple[str, ...], Callable[[chex.Array], chex.Array]]], optional):
+            A dictionary of functions to apply to the n-step transitions. The keys are tuples of data attribute
+            names the values are the functions to apply. The tuples are expected in the format where
+            the first position is the name of the data attribute being processed, the rest of the positions
+            are data attributes that are used as arguments to the function that processes the sequence of data.
+            Each function takes in a sequence of n+1 data items and returns a sequence of n+1 data items.
+            However, only the first and last value of the sequence are used and placed into first and second
+            respectively. If the dictionary has a key 'dict_mapper' then the value is a function
+            that takes in the batch of data and returns a dictionary. This function is used to map the
+            data type that to a dictionary. For dictionaries and chex.dataclasses this does not need
+            to be set but for flax structs and named tuples this needs to be set accordingly. Only the
+            data attributes that are in the dictionary are modified and all other data attributes are
+            left unchanged.
 
     Returns:
         The buffer."""
@@ -96,6 +116,7 @@ def make_prioritised_n_step_buffer(
         min_length=min_length,
         sample_batch_size=sample_batch_size,
         add_batch_size=add_batch_size,
+        n_step=n_step,
     )
     if not validate_device(device):
         device = "cpu"
@@ -114,7 +135,7 @@ def make_prioritised_n_step_buffer(
             min_length_time_axis=min_length // add_batch_size + 1,
             add_batch_size=add_batch_size,
             sample_batch_size=sample_batch_size,
-            sample_sequence_length=2,
+            sample_sequence_length=n_step + 1,
             period=1,
             max_size=max_length,
             priority_exponent=priority_exponent,
@@ -138,13 +159,21 @@ def make_prioritised_n_step_buffer(
         state: PrioritisedTrajectoryBufferState, rng_key: PRNGKey
     ) -> TransitionSample:
         """Samples a batch of transitions from the buffer."""
-        sampled_batch = buffer.sample(state, rng_key)
-        first = jax.tree_util.tree_map(lambda x: x[:, 0], sampled_batch.experience)
-        second = jax.tree_util.tree_map(lambda x: x[:, 1], sampled_batch.experience)
+        sampled_n_step_sequence = buffer.sample(state, rng_key)
+        sampled_n_step_sequence_item = sampled_n_step_sequence.experience
+
+        if n_step_functional_map is not None:
+            sampled_n_step_sequence_item = perform_n_step_functional_map(
+                n_step_functional_map, sampled_n_step_sequence_item
+            )
+        first = jax.tree_util.tree_map(lambda x: x[:, 0], sampled_n_step_sequence_item)
+        second = jax.tree_util.tree_map(
+            lambda x: x[:, -1], sampled_n_step_sequence_item
+        )
         return PrioritisedTransitionSample(
             experience=ExperiencePair(first=first, second=second),
-            indices=sampled_batch.indices,
-            priorities=sampled_batch.priorities,
+            indices=sampled_n_step_sequence.indices,
+            priorities=sampled_n_step_sequence.priorities,
         )
 
     return buffer.replace(add=add_fn, sample=sample_fn)  # type: ignore

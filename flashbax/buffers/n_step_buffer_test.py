@@ -276,24 +276,6 @@ def test_n_step_replay_buffer_does_not_smoke(
     chex.assert_tree_shape_prefix(batch, (_DEVICE_COUNT_MOCK, sample_batch_size))
 
 
-def n_step_returns(
-    r_t: chex.Array,
-    n_step: int,
-) -> chex.Array:
-    r_t = r_t[:-1]
-    n = n_step + 1
-    seq_len = r_t.shape[0]
-    targets = jnp.zeros(seq_len)
-    r_t = jnp.concatenate([r_t, jnp.zeros(n - 1)])
-
-    # Work backwards to compute n-step returns.
-    for i in reversed(range(n)):
-        r_ = r_t[i : i + seq_len]
-        targets = r_ + targets
-
-    return targets
-
-
 @pytest.mark.parametrize("n_step", [1, 2, 5, 10, 20])
 def test_n_step_sample(
     fake_transition: chex.ArrayTree,
@@ -303,7 +285,7 @@ def test_n_step_sample(
     add_batch_size: int,
     n_step: int,
 ) -> None:
-    """Test the random sampling from the buffer."""
+    """Test the random sampling from the buffer for n steps."""
     rng_key1, rng_key2 = jax.random.split(rng_key)
 
     add_sequence_size = n_step + 10
@@ -314,8 +296,12 @@ def test_n_step_sample(
     )
     assert fake_batch["obs"].shape[:2] == (add_batch_size, add_sequence_size)
 
+    fake_batch["discount"] = jnp.ones_like(fake_batch["discount"])
+
     n_step_functional_map = {
-        "reward": lambda x: jax.vmap(n_step_returns, in_axes=(0, None))(x, n_step)
+        ("reward", "reward", "discount"): lambda x, y: jax.vmap(
+            n_step_buffer.n_step_returns, in_axes=(0, 0, None)
+        )(x, y, n_step)
     }
 
     buffer = n_step_buffer.make_n_step_buffer(
@@ -361,12 +347,14 @@ class TestNStepFunctional1:
     obs: chex.Array
     reward: chex.Array
     action: chex.Array
+    discount: chex.Array
 
 
 class TestNStepFunctional2(NamedTuple):
     obs: chex.Array
     reward: chex.Array
     action: chex.Array
+    discount: chex.Array
 
 
 @struct.dataclass
@@ -374,6 +362,7 @@ class TestNStepFunctional3:
     obs: chex.Array
     reward: chex.Array
     action: chex.Array
+    discount: chex.Array
 
 
 def test_n_step_functional_with_different_types(
@@ -383,7 +372,7 @@ def test_n_step_functional_with_different_types(
     sample_batch_size: int,
     add_batch_size: int,
 ) -> None:
-    """Test the random sampling from the buffer."""
+    """Test the buffer sampling works with different data types"""
     rng_key1, rng_key2 = jax.random.split(rng_key)
 
     n_step = 5
@@ -397,6 +386,8 @@ def test_n_step_functional_with_different_types(
     )
     assert orig_fake_batch["obs"].shape[:2] == (add_batch_size, add_sequence_size)
 
+    orig_fake_batch["discount"] = jnp.ones_like(orig_fake_batch["discount"])
+
     for test_data_type in [
         TestNStepFunctional1,
         TestNStepFunctional2,
@@ -407,15 +398,19 @@ def test_n_step_functional_with_different_types(
             obs=orig_fake_transition["obs"],
             reward=orig_fake_transition["reward"],
             action=orig_fake_transition["action"],
+            discount=orig_fake_transition["discount"],
         )
         fake_batch = test_data_type(
             obs=orig_fake_batch["obs"],
             reward=orig_fake_batch["reward"],
             action=orig_fake_batch["action"],
+            discount=orig_fake_batch["discount"],
         )
 
         n_step_functional_map = {
-            "reward": lambda x: jax.vmap(n_step_returns, in_axes=(0, None))(x, n_step)
+            ("reward", "reward", "discount"): lambda x, y: jax.vmap(
+                n_step_buffer.n_step_returns, in_axes=(0, 0, None)
+            )(x, y, n_step)
         }
 
         if test_data_type == TestNStepFunctional2:

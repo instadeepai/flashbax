@@ -44,6 +44,7 @@ def fake_transition() -> chex.ArrayTree:
         "obs": jnp.array((5, 4), dtype=jnp.float32),
         "action": jnp.ones((2,), dtype=jnp.int32),
         "reward": jnp.zeros((), dtype=jnp.float32),
+        "discount": jnp.ones((), dtype=jnp.float32),
     }
 
 

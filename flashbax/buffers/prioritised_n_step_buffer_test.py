@@ -13,13 +13,16 @@
 # limitations under the License.
 
 from copy import deepcopy
+from typing import NamedTuple
 
 import chex
+import flax
 import jax
 import jax.numpy as jnp
 import pytest
+from flax import struct
 
-from flashbax.buffers import prioritised_n_step_buffer, sum_tree
+from flashbax.buffers import n_step_buffer, prioritised_n_step_buffer, sum_tree
 from flashbax.buffers.conftest import get_fake_batch
 from flashbax.conftest import _DEVICE_COUNT_MOCK
 
@@ -42,12 +45,12 @@ def test_add_and_can_sample(
     """
     fake_batch = get_fake_batch(fake_transition, add_batch_size)
     buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
-        max_length,
-        min_length,
-        sample_batch_size,
-        False,
-        add_batch_size,
-        priority_exponent,
+        max_length=max_length,
+        min_length=min_length,
+        sample_batch_size=sample_batch_size,
+        add_sequences=False,
+        add_batch_size=add_batch_size,
+        priority_exponent=priority_exponent,
     )
     init_state = buffer.init(fake_transition)
     state = deepcopy(init_state)
@@ -90,7 +93,11 @@ def test_sample(
     fake_batch = get_fake_batch(fake_transition, add_batch_size)
 
     buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
-        max_length, min_length, sample_batch_size, False, add_batch_size
+        max_length=max_length,
+        min_length=min_length,
+        sample_batch_size=sample_batch_size,
+        add_sequences=False,
+        add_batch_size=add_batch_size,
     )
     state = buffer.init(fake_transition)
 
@@ -136,12 +143,12 @@ def test_adjust_priorities(
     # Fill buffer to the point that we can sample.
     fake_batch = get_fake_batch(fake_transition, add_batch_size)
     buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
-        max_length,
-        min_length,
-        sample_batch_size,
-        False,
-        add_batch_size,
-        priority_exponent,
+        max_length=max_length,
+        min_length=min_length,
+        sample_batch_size=sample_batch_size,
+        add_sequences=False,
+        add_batch_size=add_batch_size,
+        priority_exponent=priority_exponent,
     )
     state = buffer.init(fake_transition)
 
@@ -173,17 +180,17 @@ def test_prioritised_n_step_buffer_does_not_smoke(
     sample_batch_size: int,
     priority_exponent: float,
 ):
-    """Create the FlatBuffer NamedTuple, and check that it is pmap-able and does not smoke."""
+    """Create the n-step Buffer NamedTuple, and check that it is pmap-able and does not smoke."""
 
     add_batch_size = int(min_length + 5)
 
     buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
-        max_length,
-        min_length,
-        sample_batch_size,
-        False,
-        add_batch_size,
-        priority_exponent,
+        max_length=max_length,
+        min_length=min_length,
+        sample_batch_size=sample_batch_size,
+        add_sequences=False,
+        add_batch_size=add_batch_size,
+        priority_exponent=priority_exponent,
     )
 
     # Initialise the buffer's state.
@@ -235,12 +242,12 @@ def test_add_batch_size_none(
     )
 
     buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
-        max_length,
-        min_length,
-        sample_batch_size,
-        False,
-        None,
-        priority_exponent,
+        max_length=max_length,
+        min_length=min_length,
+        sample_batch_size=sample_batch_size,
+        add_sequences=False,
+        add_batch_size=None,
+        priority_exponent=priority_exponent,
     )
     state = buffer.init(fake_transition)
 
@@ -285,12 +292,12 @@ def test_add_sequences(
     assert fake_batch["obs"].shape[0] == add_sequence_size
 
     buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
-        max_length,
-        min_length,
-        sample_batch_size,
-        True,
-        None,
-        priority_exponent,
+        max_length=max_length,
+        min_length=min_length,
+        sample_batch_size=sample_batch_size,
+        add_sequences=True,
+        add_batch_size=None,
+        priority_exponent=priority_exponent,
     )
     state = buffer.init(fake_transition)
 
@@ -328,9 +335,9 @@ def test_add_sequences_and_batches(
     assert fake_batch["obs"].shape[:2] == (add_batch_size, add_sequence_size)
 
     buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
-        max_length,
-        min_length,
-        sample_batch_size,
+        max_length=max_length,
+        min_length=min_length,
+        sample_batch_size=sample_batch_size,
         add_sequences=True,
         add_batch_size=add_batch_size,
         priority_exponent=priority_exponent,
@@ -355,3 +362,175 @@ def test_add_sequences_and_batches(
     with pytest.raises(AssertionError):
         chex.assert_trees_all_close(state.experience, init_state.experience)
         chex.assert_trees_all_close(state.indices, init_state.indices)
+
+
+@pytest.mark.parametrize("n_step", [1, 2, 5, 10, 20])
+def test_n_step_sample(
+    fake_transition: chex.ArrayTree,
+    max_length: int,
+    rng_key: chex.PRNGKey,
+    sample_batch_size: int,
+    add_batch_size: int,
+    n_step: int,
+) -> None:
+    """Test the random sampling from the buffer for n steps."""
+    rng_key1, rng_key2 = jax.random.split(rng_key)
+
+    add_sequence_size = n_step + 10
+    # create a fake batch and sequence
+    fake_batch = jax.tree_map(
+        lambda x: x[:, jnp.newaxis].repeat(add_sequence_size, axis=1) + 1,
+        get_fake_batch(fake_transition, add_batch_size),
+    )
+    assert fake_batch["obs"].shape[:2] == (add_batch_size, add_sequence_size)
+
+    fake_batch["discount"] = jnp.ones_like(fake_batch["discount"])
+
+    n_step_functional_map = {
+        ("reward", "reward", "discount"): lambda x, y: jax.vmap(
+            n_step_buffer.n_step_returns, in_axes=(0, 0, None)
+        )(x, y, n_step)
+    }
+
+    buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
+        max_length=max_length,
+        min_length=n_step,
+        sample_batch_size=sample_batch_size,
+        add_sequences=True,
+        add_batch_size=add_batch_size,
+        n_step=n_step,
+        n_step_functional_map=n_step_functional_map,
+    )
+    state = buffer.init(fake_transition)
+
+    # # Add two items thereby giving a single transition.
+    state = buffer.add(state, fake_batch)
+    state = buffer.add(state, fake_batch)
+
+    assert buffer.can_sample(state)
+
+    # # Sample from the buffer
+    batch = buffer.sample(state, rng_key1).experience
+
+    # Since rewards are always the same in a sequence i.e. [1,1,1,1,1] or [2,2,2,2,2] etc
+    # The n step return will always be divisible by n_step for e.g.
+    # if the rewards are:
+    # [1,1] then the n step return will be [2,1]
+    # [1,1,1] then the n step return will be [3,2,1]
+    # [1,1,1,1] then the n step return will be [4,3,2,1]
+    # and since we only take the first and last element of the n step return
+    # the first element will always be some multiple of n_step
+    assert jnp.all(batch.first["reward"] % n_step == 0)
+
+    for i in range(sample_batch_size):
+        # Since we know the n step return of the first element is always divisible by n_step
+        # We can work out what the reward sequence value is and that is what the n-step return
+        # of the last element should be
+        d = batch.first["reward"][i] / n_step
+        assert jnp.all(batch.second["reward"][i] == d)
+
+
+@chex.dataclass
+class TestNStepFunctional1:
+    obs: chex.Array
+    reward: chex.Array
+    action: chex.Array
+    discount: chex.Array
+
+
+class TestNStepFunctional2(NamedTuple):
+    obs: chex.Array
+    reward: chex.Array
+    action: chex.Array
+    discount: chex.Array
+
+
+@struct.dataclass
+class TestNStepFunctional3:
+    obs: chex.Array
+    reward: chex.Array
+    action: chex.Array
+    discount: chex.Array
+
+
+def test_n_step_functional_with_different_types(
+    fake_transition: chex.ArrayTree,
+    max_length: int,
+    rng_key: chex.PRNGKey,
+    sample_batch_size: int,
+    add_batch_size: int,
+) -> None:
+    """Test the buffer sampling works with different data types"""
+    rng_key1, rng_key2 = jax.random.split(rng_key)
+
+    n_step = 5
+    add_sequence_size = n_step + 10
+
+    orig_fake_transition = fake_transition
+
+    orig_fake_batch = jax.tree_map(
+        lambda x: x[:, jnp.newaxis].repeat(add_sequence_size, axis=1) + 1,
+        get_fake_batch(orig_fake_transition, add_batch_size),
+    )
+    assert orig_fake_batch["obs"].shape[:2] == (add_batch_size, add_sequence_size)
+
+    orig_fake_batch["discount"] = jnp.ones_like(orig_fake_batch["discount"])
+
+    for test_data_type in [
+        TestNStepFunctional1,
+        TestNStepFunctional2,
+        TestNStepFunctional3,
+    ]:
+        # create a fake batch and sequence
+        fake_transition = test_data_type(
+            obs=orig_fake_transition["obs"],
+            reward=orig_fake_transition["reward"],
+            action=orig_fake_transition["action"],
+            discount=orig_fake_transition["discount"],
+        )
+        fake_batch = test_data_type(
+            obs=orig_fake_batch["obs"],
+            reward=orig_fake_batch["reward"],
+            action=orig_fake_batch["action"],
+            discount=orig_fake_batch["discount"],
+        )
+
+        n_step_functional_map = {
+            ("reward", "reward", "discount"): lambda x, y: jax.vmap(
+                n_step_buffer.n_step_returns, in_axes=(0, 0, None)
+            )(x, y, n_step)
+        }
+
+        if test_data_type == TestNStepFunctional2:
+            n_step_functional_map["dict_mapper"] = lambda x: x._asdict()
+
+        if test_data_type == TestNStepFunctional3:
+            n_step_functional_map[
+                "dict_mapper"
+            ] = lambda x: flax.serialization.to_state_dict(x)
+
+        buffer = prioritised_n_step_buffer.make_prioritised_n_step_buffer(
+            max_length=max_length,
+            min_length=n_step,
+            sample_batch_size=sample_batch_size,
+            add_sequences=True,
+            add_batch_size=add_batch_size,
+            n_step=n_step,
+            n_step_functional_map=n_step_functional_map,
+        )
+        state = buffer.init(fake_transition)
+
+        # # Add two items thereby giving a single transition.
+        state = buffer.add(state, fake_batch)
+        state = buffer.add(state, fake_batch)
+
+        assert buffer.can_sample(state)
+
+        # # Sample from the buffer
+        batch = buffer.sample(state, rng_key1).experience
+
+        assert jnp.all(batch.first.reward % n_step == 0)
+
+        for i in range(sample_batch_size):
+            d = batch.first.reward[i] / n_step
+            assert jnp.all(batch.second.reward[i] == d)
