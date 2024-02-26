@@ -17,7 +17,7 @@ import json
 import os
 from ast import literal_eval as make_tuple
 from datetime import datetime
-from typing import Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -419,6 +419,7 @@ class Vault:
         self,
         read_leaf: ts.TensorStore,
         read_interval: Tuple[int, int],
+        backend_fn: Callable,
     ) -> Array:
         """Read from a leaf of the experience tree.
 
@@ -429,14 +430,17 @@ class Vault:
         Returns:
             Array: the read data, as a jax array
         """
-        return jnp.asarray(read_leaf[:, slice(*read_interval), ...].read().result())
+        return backend_fn(
+            read_leaf[:, slice(*read_interval), ...].read().result(),
+        )
 
-    def read(
+    def _read(
         self,
         timesteps: Optional[int] = None,
         percentiles: Optional[Tuple[int, int]] = None,
+        backend_fn: Callable = jnp.asarray,
     ) -> TrajectoryBufferState:
-        """Read synchronously from the vault.
+        """Internal method to read synchronously from the vault.
 
         Args:
             timesteps (Optional[int], optional):
@@ -445,9 +449,11 @@ class Vault:
             percentiles (Optional[Tuple[int, int]], optional):
                 If provided (and timesteps is None) we read the corresponding interval.
                 Defaults to None.
+            backend_fn (Callable, optional):
+                The backend function for reading the leaves. Defaults to jnp.asarray.
 
         Returns:
-            TrajectoryBufferState: the read data as a fbx buffer state
+            read_result: the read data, in the format specified by the backend_fn
         """
 
         # By default we read the entire vault
@@ -470,14 +476,98 @@ class Vault:
             lambda _, ds: self._read_leaf(
                 read_leaf=ds,
                 read_interval=read_interval,
+                backend_fn=backend_fn,
             ),
             self._tree_structure_shape,  # Just used to return a valid tree structure
             self._all_datastores,  # The vault data stores
         )
 
-        # Return the read result as a fbx buffer state
+        return read_result
+
+    def read(
+        self,
+        timesteps: Optional[int] = None,
+        percentiles: Optional[Tuple[int, int]] = None,
+    ) -> TrajectoryBufferState:
+        """Read synchronously from the vault.
+
+        Args:
+            timesteps (Optional[int], optional):
+                If provided, we read the last `timesteps` count of elements.
+                Defaults to None.
+            percentiles (Optional[Tuple[int, int]], optional):
+                If provided (and timesteps is None) we read the corresponding interval.
+                Defaults to None.
+
+        Returns:
+            TrajectoryBufferState: the read data as a fbx buffer state
+        """
         return TrajectoryBufferState(
-            experience=read_result,
+            experience=self._read(timesteps, percentiles, backend_fn=jnp.asarray),
             current_index=jnp.array(self.vault_index, dtype=int),
             is_full=jnp.array(True, dtype=bool),
         )
+
+    def read_jnp(
+        self,
+        timesteps: Optional[int] = None,
+        percentiles: Optional[Tuple[int, int]] = None,
+    ) -> TrajectoryBufferState:
+        """Read synchronously from the vault, returning jax arrays.
+
+        Args:
+            timesteps (Optional[int], optional):
+                If provided, we read the last `timesteps` count of elements.
+                Defaults to None.
+            percentiles (Optional[Tuple[int, int]], optional):
+                If provided (and timesteps is None) we read the corresponding interval.
+                Defaults to None.
+
+        Returns:
+            A JAX version of the read data.
+        """
+        return self._read(timesteps, percentiles, backend_fn=jnp.asarray)
+
+    def read_np(
+        self,
+        timesteps: Optional[int] = None,
+        percentiles: Optional[Tuple[int, int]] = None,
+    ) -> TrajectoryBufferState:
+        """Read synchronously from the vault, returning numpy arrays.
+
+        Args:
+            timesteps (Optional[int], optional):
+                If provided, we read the last `timesteps` count of elements.
+                Defaults to None.
+            percentiles (Optional[Tuple[int, int]], optional):
+                If provided (and timesteps is None) we read the corresponding interval.
+                Defaults to None.
+
+        Returns:
+            A numpy version of the read data.
+        """
+        import numpy as np
+
+        return self._read(timesteps, percentiles, backend_fn=np.asarray)
+
+    def read_tf(
+        self,
+        timesteps: Optional[int] = None,
+        percentiles: Optional[Tuple[int, int]] = None,
+    ) -> TrajectoryBufferState:
+        """Read synchronously from the vault, returning tensorflow arrays.
+
+        Args:
+            timesteps (Optional[int], optional):
+                If provided, we read the last `timesteps` count of elements.
+                Defaults to None.
+            percentiles (Optional[Tuple[int, int]], optional):
+                If provided (and timesteps is None) we read the corresponding interval.
+                Defaults to None.
+
+        Returns:
+            A TensorFlow version of the read data.
+        """
+        import tensorflow as tf  # type: ignore
+
+        return self._read(timesteps, percentiles, backend_fn=tf.convert_to_tensor)
