@@ -136,6 +136,7 @@ We provide the following Colab examples for a more advanced tutorial on how to u
 | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_flat_buffer.ipynb) | Flat Buffer Quickstart|
 | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_trajectory_buffer.ipynb) | Trajectory Buffer Quickstart|
 | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/quickstart_prioritised_flat_buffer.ipynb) | Prioritised Flat Buffer Quickstart|
+| [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/matrax_iql_example.ipynb) | Item Buffer Example with Matrax |
 | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/anakin_dqn_example.ipynb) | Anakin DQN |
 | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/anakin_prioritised_dqn_example.ipynb) | Anakin Prioritised DQN |
 | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/instadeepai/flashbax/blob/main/examples/anakin_ppo_example.ipynb) | Anakin PPO |
@@ -147,6 +148,7 @@ of RL agents end-to-end.
 from CleanRLs DQN JAX example.
 - 🦎 [Jumanji](https://github.com/instadeepai/jumanji/) - utilise Jumanji's JAX based environments
 like Snake for our fully jitted examples.
+- ✖️ [Matrax](https://github.com/instadeepai/matrax/) - two-player matrix games in JAX.
 
 ## Vault 💾
 Vault is an efficient mechanism for saving Flashbax buffers to persistent data storage, e.g. for use in offline reinforcement learning. Consider a Flashbax buffer which has experience data of dimensionality $(B, T, \*E)$, where $B$ is a batch dimension (for the sake of recording independent trajectories synchronously), $T$ is a temporal/sequential dimension, and $\*E$ indicates the one or more dimensions of the experience data itself. Since large quantities of data may be generated for a given environment, Vault extends the $T$ dimension to a virtually unconstrained degree by reading and writing slices of buffers along this temporal axis. In doing so, gigantic buffer stores can reside on disk, from which sub-buffers can be loaded into RAM/VRAM for efficient offline training. Vault has been tested with the item, flat, and trajectory buffers.
