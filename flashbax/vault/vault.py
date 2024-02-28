@@ -478,6 +478,6 @@ class Vault:
         # Return the read result as a fbx buffer state
         return TrajectoryBufferState(
             experience=read_result,
-            current_index=jnp.array(self.vault_index, dtype=int),
+            current_index=jnp.array(0, dtype=int),
             is_full=jnp.array(True, dtype=bool),
         )
