@@ -38,7 +38,7 @@ COMPRESSION_DEFAULT = {
     "id": "gzip",
     "level": 5,
 }
-VERSION = 1.1
+VERSION = 1.2
 
 
 def _path_to_ds_name(path: Tuple[Union[DictKey, GetAttrKey], ...]) -> str:
@@ -87,8 +87,8 @@ class Vault:
             vault_uid (Optional[str], optional): Unique identifier for this vault.
                 Defaults to None, which will use the current timestamp.
             compression (Optional[dict], optional):
-                Compression settings for the vault. Defaults to None, which will use
-                the default settings.
+                Compression settings used when when creating the vault.
+                Defaults to None, which will use the default compression.
             metadata (Optional[dict], optional):
                 Any additional metadata to save. Defaults to None.
 
@@ -145,7 +145,6 @@ class Vault:
                 "version": VERSION,
                 "structure_shape": serialised_experience_structure_shape,
                 "structure_dtype": serialised_experience_structure_dtype,
-                "compression": compression or COMPRESSION_DEFAULT,
                 **(metadata_json_ready or {}),  # Allow user to save extra metadata
             }
             # Dump metadata to file
@@ -184,12 +183,8 @@ class Vault:
                 target=experience_structure,
             )
 
-        # Load compression settings from metadata
-        self._compression = (
-            self._metadata["compression"]
-            if "compression" in self._metadata
-            else COMPRESSION_DEFAULT
-        )
+        # Keep the compression settings, to be used in init_leaf, in case we're creating the vault
+        self._compression = compression
 
         # Each leaf of the fbx_state.experience maps to a data store, so we tree map over the
         # tree structure to create each of the data stores.
@@ -235,11 +230,7 @@ class Vault:
                 "base": f"{DRIVER}{self._base_path}",
                 "path": name,
             },
-            "metadata": {
-                "compressor": {
-                    **self._compression,
-                }
-            },
+            "metadata": {},
         }
 
     def _init_leaf(
@@ -260,14 +251,17 @@ class Vault:
 
         leaf_shape, leaf_dtype = None, None
         if create_ds:
-            # Only specify dtype and shape if we are creating a vault
-            # (i.e. don't impose dtype and shape if we are _loading_ a vault)
+            # Only specify dtype, shape, and compression if we are creating a vault
+            # (i.e. don't impose these fields if we are _loading_ a vault)
             leaf_shape = (
                 shape[0],  # Batch dim
                 TIME_AXIS_MAX_LENGTH,  # Time dim, which we extend
                 *shape[2:],  # Experience dim(s)
             )
             leaf_dtype = dtype
+            spec["metadata"]["compressor"] = (
+                COMPRESSION_DEFAULT if self._compression is None else self._compression
+            )
 
         leaf_ds = ts.open(
             spec,
