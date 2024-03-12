@@ -115,6 +115,11 @@ class Vault:
 
             print(f"Loading vault found at {self._base_path}")
 
+            if compression is not None:
+                print(
+                    "Requested compression settings will be ignored as the vault already exists."
+                )
+
         elif experience_structure is not None:
             # Create the necessary dirs for the vault
             os.makedirs(self._base_path)
@@ -230,7 +235,6 @@ class Vault:
                 "base": f"{DRIVER}{self._base_path}",
                 "path": name,
             },
-            "metadata": {},
         }
 
     def _init_leaf(
@@ -259,9 +263,11 @@ class Vault:
                 *shape[2:],  # Experience dim(s)
             )
             leaf_dtype = dtype
-            spec["metadata"]["compressor"] = (
-                COMPRESSION_DEFAULT if self._compression is None else self._compression
-            )
+            spec["metadata"] = {
+                "compressor": COMPRESSION_DEFAULT
+                if self._compression is None
+                else self._compression
+            }
 
         leaf_ds = ts.open(
             spec,
