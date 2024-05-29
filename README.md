@@ -270,7 +270,7 @@ benchmarks.
 - 🎶 [Reverb](https://github.com/google-deepmind/reverb): efficient replay buffers used for both local and large-scale distributed RL.
 - 🍰 [Dopamine](https://github.com/google/dopamine/blob/master/dopamine/replay_memory/): research framework for fast prototyping, providing several core replay buffers.
 - 🤖 [StableBaselines3](https://stable-baselines3.readthedocs.io/en/master/): suite of reliable RL baselines with its own, easy-to-use replay buffers.
-
+- 🏛️ [Stoix](https://github.com/EdanToledo/Stoix): variety of end-to-end JAX implementations of popular algorithms utilising flashbax.
 ## Citing Flashbax ✏️
 
 If you use Flashbax in your work, please cite the library using:
