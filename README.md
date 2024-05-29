@@ -275,8 +275,8 @@ benchmarks.
   
 ### Example Usage
 Checkout some libraries from the community that utilise flashbax:
-- 🏛️ [Stoix](https://github.com/EdanToledo/Stoix): end-to-end JAX implementations of single-agent algorithms utilising flashbax.
 - 🦁 [Mava](https://github.com/instadeepai/Mava): end-to-end JAX implementations of multi-agent algorithms utilising flashbax.
+- 🏛️ [Stoix](https://github.com/EdanToledo/Stoix): end-to-end JAX implementations of single-agent algorithms utilising flashbax.
 
 ## Citing Flashbax ✏️
 
