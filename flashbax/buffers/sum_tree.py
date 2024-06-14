@@ -208,7 +208,7 @@ def stratified_sample(
     )
 
     return jax.vmap(sample, in_axes=(None, None, 0))(
-        state, None, query_values.squeeze()
+        state, None, query_values.squeeze(axis=-1)
     )
 
 
