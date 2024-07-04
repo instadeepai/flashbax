@@ -14,6 +14,7 @@
 from flashbax.buffers.flat_buffer import make_flat_buffer
 from flashbax.buffers.item_buffer import make_item_buffer
 from flashbax.buffers.prioritised_flat_buffer import make_prioritised_flat_buffer
+from flashbax.buffers.prioritised_item_buffer import make_prioritised_item_buffer
 from flashbax.buffers.prioritised_trajectory_buffer import (
     make_prioritised_trajectory_buffer,
 )
