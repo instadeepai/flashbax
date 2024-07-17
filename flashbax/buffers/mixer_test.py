@@ -80,12 +80,12 @@ def get_fake_batch_sequence(
 
 
 def test_mixed_trajectory_sample(
-    rng_key,
-    sample_batch_size,
-    sample_period,
-    add_batch_size,
-    sample_sequence_length,
-    fake_transition,
+    rng_key: chex.PRNGKey,
+    sample_batch_size: int,
+    sample_period: int,
+    add_batch_size: int,
+    sample_sequence_length: int,
+    fake_transition: chex.ArrayTree,
 ):
     buffers = []
     buffer_states = []
@@ -131,12 +131,12 @@ def test_mixed_trajectory_sample(
 
 
 def test_mixed_prioritised_trajectory_sample(
-    rng_key,
-    sample_batch_size,
-    sample_period,
-    add_batch_size,
-    sample_sequence_length,
-    fake_transition,
+    rng_key: chex.PRNGKey,
+    sample_batch_size: int,
+    sample_period: int,
+    add_batch_size: int,
+    sample_sequence_length: int,
+    fake_transition: chex.ArrayTree,
 ):
     buffers = []
     buffer_states = []
@@ -182,7 +182,10 @@ def test_mixed_prioritised_trajectory_sample(
 
 
 def test_mixed_flat_buffer_sample(
-    rng_key, sample_batch_size, add_batch_size, fake_transition
+    rng_key: chex.PRNGKey,
+    sample_batch_size: int,
+    add_batch_size: int,
+    fake_transition: chex.ArrayTree,
 ):
     buffers = []
     buffer_states = []
@@ -226,12 +229,12 @@ def test_mixed_flat_buffer_sample(
 
 
 def test_mixed_buffer_does_not_smoke(
-    rng_key,
-    sample_batch_size,
-    sample_period,
-    add_batch_size,
-    sample_sequence_length,
-    fake_transition,
+    rng_key: chex.PRNGKey,
+    sample_batch_size: int,
+    sample_period: int,
+    add_batch_size: int,
+    sample_sequence_length: int,
+    fake_transition: chex.ArrayTree,
 ):
     buffers = []
     buffer_states = []

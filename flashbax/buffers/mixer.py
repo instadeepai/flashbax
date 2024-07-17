@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import functools
-from typing import Callable, List, TypeVar
+from typing import Callable, Sequence, TypeVar
 
 import chex
 import jax
@@ -87,10 +87,10 @@ def _batch_slicer(
 
 
 def sample_mixer_fn(
-    states: List[StateTypes],
+    states: Sequence[StateTypes],
     key: chex.PRNGKey,
-    prop_batch_sizes: List[int],
-    sample_fns: List[Callable[[StateTypes, chex.PRNGKey], SampleTypes]],
+    prop_batch_sizes: Sequence[int],
+    sample_fns: Sequence[Callable[[StateTypes, chex.PRNGKey], SampleTypes]],
 ) -> SampleTypes:
     """Perform mixed sampling from provided buffer states, according to provided proportions.
 
@@ -99,12 +99,12 @@ def sample_mixer_fn(
     all samples need to be sequences of the same sequence length but batch sizes can differ.
 
     Args:
-        states (List[StateTypes]): list of buffer states
+        states (Sequence[StateTypes]): list of buffer states
         key (chex.PRNGKey): random key
-        prop_batch_sizes (List[Numeric]): list of batch sizes sampled from each buffer, calculated
-            according to the proportions of joint sample size
-        sample_fns (List[Callable[[StateTypes, chex.PRNGKey], SampleTypes]]): list of pure sample
-            functions from each buffer
+        prop_batch_sizes (Sequence[Numeric]): list of batch sizes sampled from each buffer,
+            calculated according to the proportions of joint sample size
+        sample_fns (Sequence[Callable[[StateTypes, chex.PRNGKey], SampleTypes]]): list of pure
+            sample functions from each buffer
 
     Returns:
         SampleTypes: proportionally concatenated samples from all buffers
@@ -140,13 +140,13 @@ def sample_mixer_fn(
 
 
 def can_sample_mixer_fn(
-    states: List[StateTypes], can_sample_fns: List[Callable[[StateTypes], bool]]
+    states: Sequence[StateTypes], can_sample_fns: Sequence[Callable[[StateTypes], bool]]
 ) -> bool:
     """Check if all buffers can sample.
 
     Args:
-        states (List[StateTypes]): list of buffer states
-        can_sample_fns (List[Callable[[StateTypes], bool]]): list of can_sample functions
+        states (Sequence[StateTypes]): list of buffer states
+        can_sample_fns (Sequence[Callable[[StateTypes], bool]]): list of can_sample functions
             from each buffer
 
     Returns:
@@ -162,16 +162,16 @@ def can_sample_mixer_fn(
 
 
 def make_mixer(
-    buffers: List[BufferTypes],
+    buffers: Sequence[BufferTypes],
     sample_batch_size: int,
-    proportions: List[Numeric],
+    proportions: Sequence[Numeric],
 ) -> Mixer:
     """Create the mixer.
 
     Args:
-        buffers (List[BufferTypes]): list of buffers (pure functions)
+        buffers (Sequence[BufferTypes]): list of buffers (pure functions)
         sample_batch_size (int): desired batch size of joint sample
-        proportions (List[Numeric]):
+        proportions (Sequence[Numeric]):
             Proportions of joint sample size to be sampled from each buffer, given as a ratio.
 
     Returns:
