@@ -68,3 +68,22 @@ def add_dim_to_args(
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def get_timestep_count(buffer_state: chex.ArrayTree) -> int:
+    """Utility to compute the total number of timesteps currently in the buffer state.
+
+    Args:
+        buffer_state (BufferStateTypes): the buffer state to compute the total timesteps for.
+
+    Returns:
+        int: the total number of timesteps in the buffer state.
+    """
+    # Ensure the buffer state is a valid buffer state.
+    assert hasattr(buffer_state, "experience")
+    assert hasattr(buffer_state, "current_index")
+    assert hasattr(buffer_state, "is_full")
+
+    b_size, t_size_max = get_tree_shape_prefix(buffer_state.experience, 2)
+    t_size = t_size_max if buffer_state.is_full else buffer_state.current_index
+    return int(b_size * t_size)
