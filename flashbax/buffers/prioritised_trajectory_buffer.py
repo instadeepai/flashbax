@@ -798,10 +798,11 @@ def make_prioritised_trajectory_buffer(
     if max_size is not None:
         max_length_time_axis = max_size // add_batch_size
 
+    assert max_length_time_axis is not None
     init_fn = functools.partial(
         prioritised_init,
         add_batch_size=add_batch_size,
-        max_length_time_axis=max_length_time_axis,  # type: ignore
+        max_length_time_axis=max_length_time_axis,
         period=period,
     )
     add_fn = functools.partial(
