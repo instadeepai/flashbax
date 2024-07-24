@@ -85,5 +85,10 @@ def get_timestep_count(buffer_state: chex.ArrayTree) -> int:
     assert hasattr(buffer_state, "is_full")
 
     b_size, t_size_max = get_tree_shape_prefix(buffer_state.experience, 2)
-    t_size = t_size_max if buffer_state.is_full else buffer_state.current_index
-    return int(b_size * t_size)
+    t_size = jax.lax.cond(
+        buffer_state.is_full,
+        lambda: t_size_max,
+        lambda: buffer_state.current_index,
+    )
+    timestep_count: int = b_size * t_size
+    return timestep_count
