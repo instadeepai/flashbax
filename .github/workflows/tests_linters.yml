@@ -5,7 +5,7 @@ on: [ push, pull_request ]
 jobs:
   tests-and-linters:
     name: "Python 3.9 on instadeep-ci"
-    runs-on: ubuntu:latest
+    runs-on: ubuntu-latest
     container:
         image: python:3.9
 
