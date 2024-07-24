@@ -4,25 +4,22 @@ on: [ push, pull_request ]
 
 jobs:
   tests-and-linters:
-    name: "Python ${{ matrix.python-version }} on ${{ matrix.os }}"
-    runs-on: "${{ matrix.os }}"
-
-    strategy:
-      matrix:
-        python-version: ["3.9"]
-        os: ["instadeep-ci"]
+    name: "Python 3.9 on instadeep-ci"
+    runs-on: instadeep-ci
     container:
         image: python:3.9
 
     steps:
       - name: Install dependencies for viewer test
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+        run: apt-get update && apt-get install -y xvfb
       - name: Checkout flashbax
         uses: actions/checkout@v3
       - name: Install python dependencies 🔧
         run: pip install .[dev]
       - name: List python packages 📦
         run: pip list
+      # Workaround for https://github.com/actions/checkout/issues/1169
+      - run: git config --system --add safe.directory $GITHUB_WORKSPACE
       - name: Run linters 🖌️
         run: pre-commit run --all-files --verbose
       - name: Run tests 🧪
