@@ -6,7 +6,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: instadeep-ci
+    runs-on: ubuntu:latest
     container:
       image: ghcr.io/catthehacker/ubuntu:runner-latest
     timeout-minutes: 30
