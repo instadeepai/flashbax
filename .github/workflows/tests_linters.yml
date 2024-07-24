@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.9"]
-        os: [self-hosted]
+        os: [instadeep-ci]
 
     steps:
       - name: Install dependencies for viewer test
