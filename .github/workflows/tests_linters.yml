@@ -18,6 +18,8 @@ jobs:
         run: pip install .[dev]
       - name: List python packages 📦
         run: pip list
+      - name: Update git permissions
+        run: git config --global --add safe.directory /__w/flashbax/flashbax
       - name: Run linters 🖌️
         run: pre-commit run --all-files --verbose
       - name: Run tests 🧪
@@ -26,6 +28,3 @@ jobs:
         run: |
           coverage html --directory=coverage_html_report
           coverage report --fail-under=0.97
-      - name: Print pre-commit log on failure
-        if: failure()
-        run: cat /github/home/.cache/pre-commit/pre-commit.log
