@@ -101,7 +101,8 @@ class Vault:
         """
         # Get the base path for the vault and the metadata path
         vault_str = vault_uid if vault_uid else datetime.now().strftime("%Y%m%d%H%M%S")
-        self._base_path = os.path.join(os.getcwd(), rel_dir, vault_name, vault_str)
+        base_path_unnorm = os.path.join(os.getcwd(), rel_dir, vault_name, vault_str)
+        self._base_path = os.path.normpath(base_path_unnorm)
         metadata_path = epath.Path(os.path.join(self._base_path, METADATA_FILE))
 
         # Check if the vault exists, otherwise create the necessary dirs and files
