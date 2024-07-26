@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Install dependencies for viewer test
-        run: apt-get update && apt-get install -y xvfb
+        run: apt-get update && apt-get install -y xvfb git
       - name: Checkout flashbax
         uses: actions/checkout@v3
       - name: Install python dependencies 🔧
