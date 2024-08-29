@@ -801,7 +801,7 @@ def make_prioritised_trajectory_buffer(
     init_fn = functools.partial(
         prioritised_init,
         add_batch_size=add_batch_size,
-        max_length_time_axis=max_length_time_axis,  # type: ignore
+        max_length_time_axis=max_length_time_axis,
         period=period,
     )
     add_fn = functools.partial(
