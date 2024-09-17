@@ -59,12 +59,12 @@ def add_dim_to_args(
 
         args = list(args)
         args[starting_arg_index:end_index] = [
-            jax.tree_map(lambda x: jnp.expand_dims(x, axis=axis), a)
+            jax.tree.map(lambda x: jnp.expand_dims(x, axis=axis), a)
             for a in args[starting_arg_index:end_index]
         ]
         for k, v in kwargs.items():
             if kwargs_on_device_keys is None or k in kwargs_on_device_keys:
-                kwargs[k] = jax.tree_map(lambda x: jnp.expand_dims(x, axis=1), v)
+                kwargs[k] = jax.tree.map(lambda x: jnp.expand_dims(x, axis=1), v)
         return func(*args, **kwargs)
 
     return wrapper

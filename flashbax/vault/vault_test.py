@@ -190,7 +190,7 @@ def test_reload_vault(
         for i in range(0, max_length):
             buffer_state = buffer_add(
                 buffer_state,
-                jax.tree_map(partial(multiplier, i=i), fake_transition),
+                jax.tree.map(partial(multiplier, i=i), fake_transition),
             )
             v.write(buffer_state)
 

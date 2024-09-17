@@ -88,10 +88,10 @@ def init(
             been added yet.
     """
     # Set experience value to be empty.
-    experience = jax.tree_map(jnp.empty_like, experience)
+    experience = jax.tree.map(jnp.empty_like, experience)
 
     # Broadcast to [add_batch_size, max_length_time_axis]
-    experience = jax.tree_map(
+    experience = jax.tree.map(
         lambda x: jnp.broadcast_to(
             x[None, None, ...], (add_batch_size, max_length_time_axis, *x.shape)
         ),

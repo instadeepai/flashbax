@@ -49,6 +49,6 @@ def fake_transition() -> chex.ArrayTree:
 
 def get_fake_batch(fake_transition: chex.ArrayTree, batch_size) -> chex.ArrayTree:
     """Create a fake batch with differing values for each transition."""
-    return jax.tree_map(
+    return jax.tree.map(
         lambda x: jnp.stack([x + i for i in range(batch_size)]), fake_transition
     )
