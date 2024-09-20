@@ -55,7 +55,7 @@ dev = [
     'mkdocs-mermaid2-plugin==1.1.1',
     'mkdocstrings[python]==0.23.0',
     'mknotebooks==0.8.0',
-    'mypy>=0.982',
+    'mypy>=1.8.0',
     'pre-commit>=2.20.0',
     'pytest>=7.4.2',
     'pytest-cov>=4.00',

@@ -19,6 +19,7 @@ import chex
 import jax
 import jax.numpy as jnp
 from chex import Numeric, dataclass
+from jax import Array
 from jax.tree_util import tree_map
 
 from flashbax.buffers.flat_buffer import TransitionSample
@@ -140,25 +141,28 @@ def sample_mixer_fn(
 
 
 def can_sample_mixer_fn(
-    states: Sequence[StateTypes], can_sample_fns: Sequence[Callable[[StateTypes], bool]]
-) -> bool:
+    states: Sequence[StateTypes],
+    can_sample_fns: Sequence[Callable[[StateTypes], Array]],
+) -> Array:
     """Check if all buffers can sample.
 
     Args:
         states (Sequence[StateTypes]): list of buffer states
-        can_sample_fns (Sequence[Callable[[StateTypes], bool]]): list of can_sample functions
+        can_sample_fns (Sequence[Callable[[StateTypes], Array]]): list of can_sample functions
             from each buffer
 
     Returns:
         bool: whether all buffers can sample
     """
-    each_can_sample = tree_map(
-        lambda state, can_sample: can_sample(state),
-        states,
-        can_sample_fns,
-        is_leaf=lambda leaf: type(leaf) in state_types,
+    each_can_sample = jnp.asarray(
+        tree_map(
+            lambda state, can_sample: can_sample(state),
+            states,
+            can_sample_fns,
+            is_leaf=lambda leaf: type(leaf) in state_types,
+        )
     )
-    return all(each_can_sample)
+    return jnp.all(each_can_sample)
 
 
 def make_mixer(

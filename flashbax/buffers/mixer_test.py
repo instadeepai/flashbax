@@ -265,6 +265,10 @@ def test_mixed_buffer_does_not_smoke(
         proportions=proportions,
         sample_batch_size=sample_batch_size,
     )
+
+    can_sample = jax.jit(mixer.can_sample)(buffer_states)
+    assert can_sample
+
     samples = jax.jit(mixer.sample)(buffer_states, rng_key)
 
     assert samples is not None
