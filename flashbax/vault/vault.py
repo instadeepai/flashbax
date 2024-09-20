@@ -127,9 +127,11 @@ class Vault:
 
             # Ensure provided metadata is json serialisable
             metadata_json_ready = jax.tree_util.tree_map(
-                lambda obj: str(obj)
-                if not isinstance(obj, (bool, str, int, float, type(None)))
-                else obj,
+                lambda obj: (
+                    str(obj)
+                    if not isinstance(obj, (bool, str, int, float, type(None)))
+                    else obj
+                ),
                 metadata,
             )
 
@@ -137,11 +139,11 @@ class Vault:
             # each leaf. We will use this structure to map over the data stores later.
             # (Note: we use `jax.eval_shape` to get shape and dtype of each leaf, without
             # unnecessarily serialising the buffer data itself)
-            serialised_experience_structure_shape = jax.tree_map(
+            serialised_experience_structure_shape = jax.tree.map(
                 lambda x: str(x.shape),
                 serialize_tree(jax.eval_shape(lambda: experience_structure)),
             )
-            serialised_experience_structure_dtype = jax.tree_map(
+            serialised_experience_structure_dtype = jax.tree.map(
                 lambda x: x.dtype.name,
                 serialize_tree(jax.eval_shape(lambda: experience_structure)),
             )
@@ -265,9 +267,11 @@ class Vault:
             )
             leaf_dtype = dtype
             spec["metadata"] = {
-                "compressor": COMPRESSION_DEFAULT
-                if self._compression is None
-                else self._compression
+                "compressor": (
+                    COMPRESSION_DEFAULT
+                    if self._compression is None
+                    else self._compression
+                )
             }
 
         leaf_ds = ts.open(

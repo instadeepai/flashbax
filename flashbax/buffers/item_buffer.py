@@ -90,7 +90,7 @@ def create_item_buffer(
     ) -> TrajectoryBufferState[Experience]:
         """Flattens a batch to add items along single time axis."""
         batch_size, seq_len = utils.get_tree_shape_prefix(batch, n_axes=2)
-        flattened_batch = jax.tree_map(
+        flattened_batch = jax.tree.map(
             lambda x: x.reshape((1, batch_size * seq_len, *x.shape[2:])), batch
         )
         return buffer.add(state, flattened_batch)
@@ -111,7 +111,7 @@ def create_item_buffer(
     ) -> TrajectoryBufferSample[Experience]:
         """Samples a batch of items from the buffer."""
         sampled_batch = buffer.sample(state, rng_key).experience
-        sampled_batch = jax.tree_map(lambda x: x.squeeze(axis=1), sampled_batch)
+        sampled_batch = jax.tree.map(lambda x: x.squeeze(axis=1), sampled_batch)
         return TrajectoryBufferSample(experience=sampled_batch)
 
     return buffer.replace(add=add_fn, sample=sample_fn)  # type: ignore

@@ -421,7 +421,7 @@ def test_trajectory_queue_does_not_smoke(
     )
 
     # Initialise the queue's state.
-    fake_trajectory_per_device = jax.tree_map(
+    fake_trajectory_per_device = jax.tree.map(
         lambda x: jnp.stack([x + i for i in range(_DEVICE_COUNT_MOCK)]), fake_transition
     )
     state = jax.pmap(queue.init)(fake_trajectory_per_device)
