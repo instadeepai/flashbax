@@ -187,7 +187,7 @@ def test_prioritised_flat_buffer_does_not_smoke(
     )
 
     # Initialise the buffer's state.
-    fake_transition_per_device = jax.tree_map(
+    fake_transition_per_device = jax.tree.map(
         lambda x: jnp.stack([x + i for i in range(_DEVICE_COUNT_MOCK)]), fake_transition
     )
     state = jax.pmap(buffer.init)(fake_transition_per_device)
@@ -230,7 +230,7 @@ def test_add_batch_size_none(
     priority_exponent: float,
 ):
     # create a fake batch and ensure there is no batch dimension
-    fake_batch = jax.tree_map(
+    fake_batch = jax.tree.map(
         lambda x: jnp.squeeze(x, 0), get_fake_batch(fake_transition, 1)
     )
 
@@ -278,7 +278,7 @@ def test_add_sequences(
 ):
     add_sequence_size = 5
     # create a fake sequence and ensure there is no batch dimension
-    fake_batch = jax.tree_map(
+    fake_batch = jax.tree.map(
         lambda x: x.repeat(add_sequence_size, axis=0),
         get_fake_batch(fake_transition, 1),
     )
@@ -321,7 +321,7 @@ def test_add_sequences_and_batches(
 ):
     add_sequence_size = 5
     # create a fake batch and sequence
-    fake_batch = jax.tree_map(
+    fake_batch = jax.tree.map(
         lambda x: x[:, jnp.newaxis].repeat(add_sequence_size, axis=1),
         get_fake_batch(fake_transition, add_batch_size),
     )

@@ -83,7 +83,7 @@ def create_prioritised_item_buffer(
     ) -> PrioritisedTrajectoryBufferState[Experience]:
         """Flattens a batch to add items along single time axis."""
         batch_size, seq_len = utils.get_tree_shape_prefix(batch, n_axes=2)
-        flattened_batch = jax.tree_map(
+        flattened_batch = jax.tree.map(
             lambda x: x.reshape((1, batch_size * seq_len, *x.shape[2:])), batch
         )
         return buffer.add(state, flattened_batch)
@@ -107,7 +107,7 @@ def create_prioritised_item_buffer(
         priorities = sampled_batch.priorities
         indices = sampled_batch.indices
         sampled_batch = sampled_batch.experience
-        sampled_batch = jax.tree_map(lambda x: x.squeeze(axis=1), sampled_batch)
+        sampled_batch = jax.tree.map(lambda x: x.squeeze(axis=1), sampled_batch)
         return PrioritisedTrajectoryBufferSample(
             experience=sampled_batch, indices=indices, priorities=priorities
         )

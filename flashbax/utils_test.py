@@ -29,7 +29,7 @@ def fake_transition() -> chex.ArrayTree:
 def get_fake_batch(fake_transition: chex.ArrayTree, batch_size) -> chex.ArrayTree:
     """Create a tree with the same structure as `fake_transition` but with an extra batch axis.
     Each element across the batch dimension is different."""
-    return jax.tree_map(
+    return jax.tree.map(
         lambda x: jnp.stack([x + i for i in range(batch_size)]), fake_transition
     )
 

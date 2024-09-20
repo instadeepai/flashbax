@@ -204,7 +204,7 @@ def test_prioritised_sample_with_period(
 
     # Create a batch but specifically ensure that sequences in different add_batch rows
     # are distinct - this is simply for testing purposes in order to verify periodicity
-    fake_batch_sequence = jax.tree_map(
+    fake_batch_sequence = jax.tree.map(
         lambda x: jnp.stack([x + i * (max_length - 1) for i in range(add_batch_size)]),
         get_fake_batch(fake_transition, max_length - 1),
     )
@@ -318,7 +318,7 @@ def test_prioritised_trajectory_buffer_does_not_smoke(
     )
 
     # Initialise the buffer's state.
-    fake_trajectory_per_device = jax.tree_map(
+    fake_trajectory_per_device = jax.tree.map(
         lambda x: jnp.stack([x + i for i in range(_DEVICE_COUNT_MOCK)]), fake_transition
     )
     state = jax.pmap(buffer.init)(fake_trajectory_per_device)
