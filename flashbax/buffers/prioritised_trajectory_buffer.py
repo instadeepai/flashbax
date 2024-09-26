@@ -21,7 +21,7 @@ period. Prioritisation is implemented as done in the PER paper https://arxiv.org
 """
 
 
-import functools
+from jax.tree_util import Partial as partial
 import warnings
 from typing import TYPE_CHECKING, Callable, Generic, Optional, Tuple
 
@@ -799,29 +799,29 @@ def make_prioritised_trajectory_buffer(
         max_length_time_axis = max_size // add_batch_size
 
     assert max_length_time_axis is not None
-    init_fn = functools.partial(
+    init_fn = partial(
         prioritised_init,
         add_batch_size=add_batch_size,
         max_length_time_axis=max_length_time_axis,
         period=period,
     )
-    add_fn = functools.partial(
+    add_fn = partial(
         prioritised_add,
         sample_sequence_length=sample_sequence_length,
         period=period,
         device=device,
     )
-    sample_fn = functools.partial(
+    sample_fn = partial(
         prioritised_sample,
         batch_size=sample_batch_size,
         sequence_length=sample_sequence_length,
         period=period,
     )
-    can_sample_fn = functools.partial(
+    can_sample_fn = partial(
         can_sample, min_length_time_axis=min_length_time_axis
     )
 
-    set_priorities_fn = functools.partial(
+    set_priorities_fn = partial(
         set_priorities, priority_exponent=priority_exponent, device=device
     )
 
