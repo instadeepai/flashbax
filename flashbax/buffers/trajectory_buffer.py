@@ -19,7 +19,7 @@ concatenates consecutive batches of experience data along the time axis, retaini
 This allows for random sampling of the trajectories within the buffer.
 """
 
-import functools
+from jax.tree_util import Partial as partial
 import warnings
 from typing import TYPE_CHECKING, Callable, Generic, Optional, TypeVar
 
@@ -586,21 +586,21 @@ def make_trajectory_buffer(
         max_length_time_axis = max_size // add_batch_size
 
     assert max_length_time_axis is not None
-    init_fn = functools.partial(
+    init_fn = partial(
         init,
         add_batch_size=add_batch_size,
         max_length_time_axis=max_length_time_axis,
     )
-    add_fn = functools.partial(
+    add_fn = partial(
         add,
     )
-    sample_fn = functools.partial(
+    sample_fn = partial(
         sample,
         batch_size=sample_batch_size,
         sequence_length=sample_sequence_length,
         period=period,
     )
-    can_sample_fn = functools.partial(
+    can_sample_fn = partial(
         can_sample, min_length_time_axis=min_length_time_axis
     )
 

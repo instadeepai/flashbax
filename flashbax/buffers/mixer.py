@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
+from jax.tree_util import Partial as partial
 from typing import Callable, Sequence, TypeVar
 
 import chex
@@ -200,13 +200,13 @@ def make_mixer(
         # In case of rounding errors, add the remainder to the first buffer's proportion
         prop_batch_sizes[0] += sample_batch_size - sum(prop_batch_sizes)
 
-    mixer_sample_fn = functools.partial(
+    mixer_sample_fn = partial(
         sample_mixer_fn,
         prop_batch_sizes=prop_batch_sizes,
         sample_fns=sample_fns,
     )
 
-    mixer_can_sample_fn = functools.partial(
+    mixer_can_sample_fn = partial(
         can_sample_mixer_fn,
         can_sample_fns=can_sample_fns,
     )

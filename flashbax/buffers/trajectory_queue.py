@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-import functools
+from jax.tree_util import Partial as partial
 import warnings
 from typing import TYPE_CHECKING, Callable, Generic, Optional, Tuple, TypeVar
 
@@ -386,24 +386,24 @@ def make_trajectory_queue(
     if max_size is not None:
         max_length_time_axis = max_size // add_batch_size
 
-    init_fn = functools.partial(
+    init_fn = partial(
         init,
         add_batch_size=add_batch_size,
         max_length_time_axis=max_length_time_axis,
     )
-    add_fn = functools.partial(
+    add_fn = partial(
         add,
     )
-    sample_fn = functools.partial(
+    sample_fn = partial(
         sample,
         sequence_length=sample_sequence_length,
     )
-    can_sample_fn = functools.partial(
+    can_sample_fn = partial(
         can_sample,
         sample_sequence_length=sample_sequence_length,
         max_length_time_axis=max_length_time_axis,
     )
-    can_add_fn = functools.partial(
+    can_add_fn = partial(
         can_add,
         add_sequence_length=add_sequence_length,
         max_length_time_axis=max_length_time_axis,
