@@ -440,7 +440,7 @@ def prioritised_add(
     add_batch_size, max_length_time_axis = utils.get_tree_shape_prefix(
         state.experience, n_axes=2
     )
-    chex.assert_axis_dimension_lt(
+    chex.assert_axis_dimension_lteq(
         jax.tree_util.tree_leaves(batch)[0], 1, max_length_time_axis
     )
 
