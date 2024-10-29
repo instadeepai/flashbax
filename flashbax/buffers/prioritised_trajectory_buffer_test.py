@@ -100,6 +100,14 @@ def test_add_max_length(
         device,
     )
     assert prioritised_state.is_full
+    sampled = prioritised_trajectory_buffer.prioritised_sample(
+        prioritised_state,
+        jax.random.PRNGKey(0),
+        1,
+        sample_sequence_length,
+        sample_period,
+    )
+    assert sampled.experience["reward"].shape == (1, sample_sequence_length)
 
 
 def test_add_and_can_sample_prioritised(
