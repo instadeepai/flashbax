@@ -73,6 +73,43 @@ def get_fake_batch_sequence(
     return get_fake_batch(get_fake_batch(fake_transition, sequence_length), batch_size)
 
 
+def test_add_max_length(
+    fake_transition: chex.ArrayTree,
+    device: str,
+    sample_period: int,
+    max_length: int,
+    add_batch_size: int,
+    sample_sequence_length: int,
+) -> None:
+    """Check the `add` function works when adding the max length."""
+    prioritised_state = prioritised_trajectory_buffer.prioritised_init(
+        fake_transition,
+        add_batch_size,
+        max_length,
+        sample_period,
+    )
+    fake_batch_sequence = get_fake_batch_sequence(
+        fake_transition, add_batch_size, max_length
+    )
+    assert not prioritised_state.is_full
+    prioritised_state = prioritised_trajectory_buffer.prioritised_add(
+        prioritised_state,
+        fake_batch_sequence,
+        sample_sequence_length,
+        sample_period,
+        device,
+    )
+    assert prioritised_state.is_full
+    sampled = prioritised_trajectory_buffer.prioritised_sample(
+        prioritised_state,
+        jax.random.PRNGKey(0),
+        1,
+        sample_sequence_length,
+        sample_period,
+    )
+    assert sampled.experience["reward"].shape == (1, sample_sequence_length)
+
+
 def test_add_and_can_sample_prioritised(
     prioritised_state: prioritised_trajectory_buffer.PrioritisedTrajectoryBufferState,
     fake_transition: chex.ArrayTree,
