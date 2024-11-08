@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import warnings
 from typing import TYPE_CHECKING, Generic, Optional
 
 from chex import PRNGKey
@@ -113,24 +112,15 @@ def create_flat_buffer(
         add_batch_size=add_batch_size,
     )
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message="Setting max_size dynamically sets the `max_length_time_axis` to "
-            f"be `max_size`//`add_batch_size = {max_length // add_batch_size}`."
-            "This allows one to control exactly how many transitions are stored in the buffer."
-            "Note that this overrides the `max_length_time_axis` argument.",
-        )
-
-        buffer = make_trajectory_buffer(
-            max_length_time_axis=None,  # Unused because max_size is specified
-            min_length_time_axis=min_length // add_batch_size + 1,
-            add_batch_size=add_batch_size,
-            sample_batch_size=sample_batch_size,
-            sample_sequence_length=2,
-            period=1,
-            max_size=max_length,
-        )
+    buffer = make_trajectory_buffer(
+        max_length_time_axis=max_length // add_batch_size,
+        min_length_time_axis=min_length // add_batch_size + 1,
+        add_batch_size=add_batch_size,
+        sample_batch_size=sample_batch_size,
+        sample_sequence_length=2,
+        period=1,
+        max_size=None,
+    )
 
     add_fn = buffer.add
 
