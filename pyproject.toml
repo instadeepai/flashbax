@@ -16,7 +16,6 @@ filterwarnings = [
     "error",
     "ignore:`sample_sequence_length` greater than `min_length_time_axis`:UserWarning:flashbax",
     "ignore:Setting period greater than sample_sequence_length will result in no overlap betweentrajectories:UserWarning:flashbax",
-    "ignore:Setting max_size dynamically sets the `max_length_time_axis` to be `max_size`//`add_batch_size = .*`:UserWarning:flashbax",
     "ignore:jax.tree_map is deprecated:DeprecationWarning:flashbax",
 ]
 
