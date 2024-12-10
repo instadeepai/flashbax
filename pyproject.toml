@@ -14,7 +14,6 @@ include = ["flashbax/*"]
 [tool.pytest.ini_options]
 filterwarnings = [
     "error",
-    "ignore:`sample_sequence_length` greater than `min_length_time_axis`:UserWarning:flashbax",
     "ignore:Setting period greater than sample_sequence_length will result in no overlap betweentrajectories:UserWarning:flashbax",
     "ignore:jax.tree_map is deprecated:DeprecationWarning:flashbax",
 ]

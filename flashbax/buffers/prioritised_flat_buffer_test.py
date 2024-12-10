@@ -90,7 +90,7 @@ def test_sample(
     fake_batch = get_fake_batch(fake_transition, add_batch_size)
 
     buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
-        max_length, min_length, sample_batch_size, False, add_batch_size
+        max_length, add_batch_size, sample_batch_size, False, add_batch_size
     )
     state = buffer.init(fake_transition)
 
@@ -137,7 +137,7 @@ def test_adjust_priorities(
     fake_batch = get_fake_batch(fake_transition, add_batch_size)
     buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
         max_length,
-        min_length,
+        add_batch_size,
         sample_batch_size,
         False,
         add_batch_size,
@@ -179,7 +179,7 @@ def test_prioritised_flat_buffer_does_not_smoke(
 
     buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
         max_length,
-        min_length,
+        add_batch_size,
         sample_batch_size,
         False,
         add_batch_size,
@@ -313,7 +313,6 @@ def test_add_sequences(
 
 def test_add_sequences_and_batches(
     fake_transition: chex.ArrayTree,
-    min_length: int,
     max_length: int,
     add_batch_size: int,
     sample_batch_size: int,
@@ -329,7 +328,7 @@ def test_add_sequences_and_batches(
 
     buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
         max_length,
-        min_length,
+        add_batch_size,
         sample_batch_size,
         add_sequences=True,
         add_batch_size=add_batch_size,

@@ -78,8 +78,9 @@ def test_sample(
     # Fill buffer to the point that we can sample
     fake_batch = get_fake_batch(fake_transition, int(min_length + 10))
 
+    add_batch_size = int(min_length + 10)
     buffer = flat_buffer.make_flat_buffer(
-        max_length, min_length, sample_batch_size, False, int(min_length + 10)
+        max_length, add_batch_size, sample_batch_size, False, add_batch_size
     )
     state = buffer.init(fake_transition)
 
@@ -224,7 +225,7 @@ def test_flat_replay_buffer_does_not_smoke(
 
     add_batch_size = int(min_length + 5)
     buffer = flat_buffer.make_flat_buffer(
-        max_length, min_length, sample_batch_size, False, add_batch_size
+        max_length, add_batch_size, sample_batch_size, False, add_batch_size
     )
 
     # Initialise the buffer's state.

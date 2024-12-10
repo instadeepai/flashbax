@@ -165,7 +165,7 @@ def test_add_sample_max_capacity(
     sample_sequence_length = add_sequence_length
     buffer = trajectory_buffer.make_trajectory_buffer(
         max_length_time_axis=add_sequence_length,
-        min_length_time_axis=0,
+        min_length_time_axis=sample_sequence_length,
         sample_batch_size=sample_batch_size,
         add_batch_size=add_batch_size,
         sample_sequence_length=sample_sequence_length,
@@ -342,7 +342,7 @@ def test_uniform_index_cal(
 
     buffer = trajectory_buffer.make_trajectory_buffer(
         max_length_time_axis=max_length,
-        min_length_time_axis=0,
+        min_length_time_axis=sample_sequence_length,
         sample_batch_size=sample_batch_size,
         add_batch_size=add_batch_size,
         sample_sequence_length=sample_sequence_length,

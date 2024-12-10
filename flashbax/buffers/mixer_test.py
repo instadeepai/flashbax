@@ -92,7 +92,7 @@ def test_mixed_trajectory_sample(
     for i in range(3):
         buffer = trajectory_buffer.make_trajectory_buffer(
             max_length_time_axis=200 * (i + 1),
-            min_length_time_axis=0,
+            min_length_time_axis=sample_sequence_length,
             sample_batch_size=sample_batch_size,
             add_batch_size=add_batch_size,
             sample_sequence_length=sample_sequence_length,
@@ -143,7 +143,7 @@ def test_mixed_prioritised_trajectory_sample(
     for i in range(3):
         buffer = prioritised_trajectory_buffer.make_prioritised_trajectory_buffer(
             max_length_time_axis=200 * (i + 1),
-            min_length_time_axis=0,
+            min_length_time_axis=sample_sequence_length,
             sample_batch_size=sample_batch_size,
             add_batch_size=add_batch_size,
             sample_sequence_length=sample_sequence_length,
@@ -192,7 +192,7 @@ def test_mixed_flat_buffer_sample(
     for i in range(3):
         buffer = flat_buffer.make_flat_buffer(
             max_length=200 * (i + 1),
-            min_length=0,
+            min_length=add_batch_size,
             sample_batch_size=sample_batch_size,
             add_batch_size=add_batch_size,
             add_sequences=True,
@@ -241,7 +241,7 @@ def test_mixed_buffer_does_not_smoke(
     for i in range(3):
         buffer = trajectory_buffer.make_trajectory_buffer(
             max_length_time_axis=2000 * (i + 1),
-            min_length_time_axis=0,
+            min_length_time_axis=sample_sequence_length,
             sample_batch_size=sample_batch_size,
             add_batch_size=add_batch_size,
             sample_sequence_length=sample_sequence_length,
