@@ -85,12 +85,11 @@ def test_sample(
     """Test the random sampling from the buffer."""
     rng_key1, rng_key2 = jax.random.split(rng_key)
 
-    add_batch_size = int(min_length + 10)
     # Fill buffer to the point that we can sample
-    fake_batch = get_fake_batch(fake_transition, add_batch_size)
+    fake_batch = get_fake_batch(fake_transition, min_length)
 
     buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
-        max_length, add_batch_size, sample_batch_size, False, add_batch_size
+        max_length, min_length, sample_batch_size, False, add_batch_size=min_length
     )
     state = buffer.init(fake_transition)
 
@@ -132,16 +131,15 @@ def test_adjust_priorities(
     """Test the adjustment of priorities in the buffer."""
     rng_key1, rng_key2 = jax.random.split(rng_key)
 
-    add_batch_size = int(min_length + 10)
     # Fill buffer to the point that we can sample.
-    fake_batch = get_fake_batch(fake_transition, add_batch_size)
+    fake_batch = get_fake_batch(fake_transition, min_length)
     buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
         max_length,
-        add_batch_size,
+        min_length,
         sample_batch_size,
         False,
-        add_batch_size,
-        priority_exponent,
+        add_batch_size=min_length,
+        priority_exponent=priority_exponent,
     )
     state = buffer.init(fake_transition)
 
@@ -175,15 +173,13 @@ def test_prioritised_flat_buffer_does_not_smoke(
 ):
     """Create the FlatBuffer NamedTuple, and check that it is pmap-able and does not smoke."""
 
-    add_batch_size = int(min_length + 5)
-
     buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
         max_length,
-        add_batch_size,
+        min_length,
         sample_batch_size,
         False,
-        add_batch_size,
-        priority_exponent,
+        add_batch_size=min_length,
+        priority_exponent=priority_exponent,
     )
 
     # Initialise the buffer's state.
@@ -195,7 +191,7 @@ def test_prioritised_flat_buffer_does_not_smoke(
     # Now fill the buffer above its minimum length.
 
     fake_batch = jax.pmap(get_fake_batch, static_broadcasted_argnums=1)(
-        fake_transition_per_device, add_batch_size
+        fake_transition_per_device, min_length
     )
     # Add two items thereby giving a single transition.
     state = jax.pmap(buffer.add)(state, fake_batch)
@@ -313,8 +309,8 @@ def test_add_sequences(
 
 def test_add_sequences_and_batches(
     fake_transition: chex.ArrayTree,
+    min_length: int,
     max_length: int,
-    add_batch_size: int,
     sample_batch_size: int,
     priority_exponent: float,
 ):
@@ -322,16 +318,16 @@ def test_add_sequences_and_batches(
     # create a fake batch and sequence
     fake_batch = jax.tree.map(
         lambda x: x[:, jnp.newaxis].repeat(add_sequence_size, axis=1),
-        get_fake_batch(fake_transition, add_batch_size),
+        get_fake_batch(fake_transition, min_length),
     )
-    assert fake_batch["obs"].shape[:2] == (add_batch_size, add_sequence_size)
+    assert fake_batch["obs"].shape[:2] == (min_length, add_sequence_size)
 
     buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
         max_length,
-        add_batch_size,
+        min_length,
         sample_batch_size,
         add_sequences=True,
-        add_batch_size=add_batch_size,
+        add_batch_size=min_length,
         priority_exponent=priority_exponent,
     )
 
@@ -339,13 +335,13 @@ def test_add_sequences_and_batches(
 
     init_state = deepcopy(state)  # Save for later checks.
 
-    n_sequences_to_fill = (max_length // add_batch_size // add_sequence_size) + 1
+    n_sequences_to_fill = (max_length // min_length // add_sequence_size) + 1
 
     for i in range(n_sequences_to_fill):
         assert not state.is_full
         state = buffer.add(state, fake_batch)
         assert state.current_index == (
-            ((i + 1) * add_sequence_size) % (max_length // add_batch_size)
+            ((i + 1) * add_sequence_size) % (max_length // min_length)
         )
 
     assert state.is_full
