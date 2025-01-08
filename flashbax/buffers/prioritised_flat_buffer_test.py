@@ -311,6 +311,7 @@ def test_add_sequences_and_batches(
     fake_transition: chex.ArrayTree,
     min_length: int,
     max_length: int,
+    add_batch_size: int,
     sample_batch_size: int,
     priority_exponent: float,
 ):
@@ -318,16 +319,16 @@ def test_add_sequences_and_batches(
     # create a fake batch and sequence
     fake_batch = jax.tree.map(
         lambda x: x[:, jnp.newaxis].repeat(add_sequence_size, axis=1),
-        get_fake_batch(fake_transition, min_length),
+        get_fake_batch(fake_transition, add_batch_size),
     )
-    assert fake_batch["obs"].shape[:2] == (min_length, add_sequence_size)
+    assert fake_batch["obs"].shape[:2] == (add_batch_size, add_sequence_size)
 
     buffer = prioritised_flat_buffer.make_prioritised_flat_buffer(
         max_length,
         min_length,
         sample_batch_size,
         add_sequences=True,
-        add_batch_size=min_length,
+        add_batch_size=add_batch_size,
         priority_exponent=priority_exponent,
     )
 
@@ -335,13 +336,13 @@ def test_add_sequences_and_batches(
 
     init_state = deepcopy(state)  # Save for later checks.
 
-    n_sequences_to_fill = (max_length // min_length // add_sequence_size) + 1
+    n_sequences_to_fill = (max_length // add_batch_size // add_sequence_size) + 1
 
     for i in range(n_sequences_to_fill):
         assert not state.is_full
         state = buffer.add(state, fake_batch)
         assert state.current_index == (
-            ((i + 1) * add_sequence_size) % (max_length // min_length)
+            ((i + 1) * add_sequence_size) % (max_length // add_batch_size)
         )
 
     assert state.is_full

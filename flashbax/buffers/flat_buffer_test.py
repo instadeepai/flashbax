@@ -76,7 +76,7 @@ def test_sample(
     rng_key1, rng_key2 = jax.random.split(rng_key)
 
     # Fill buffer to the point that we can sample
-    fake_batch = get_fake_batch(fake_transition, int(min_length + 10))
+    fake_batch = get_fake_batch(fake_transition, min_length)
 
     buffer = flat_buffer.make_flat_buffer(
         max_length, min_length, sample_batch_size, False, add_batch_size=min_length
