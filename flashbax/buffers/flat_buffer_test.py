@@ -76,10 +76,10 @@ def test_sample(
     rng_key1, rng_key2 = jax.random.split(rng_key)
 
     # Fill buffer to the point that we can sample
-    fake_batch = get_fake_batch(fake_transition, int(min_length + 10))
+    fake_batch = get_fake_batch(fake_transition, min_length)
 
     buffer = flat_buffer.make_flat_buffer(
-        max_length, min_length, sample_batch_size, False, int(min_length + 10)
+        max_length, min_length, sample_batch_size, False, add_batch_size=min_length
     )
     state = buffer.init(fake_transition)
 
@@ -222,9 +222,8 @@ def test_flat_replay_buffer_does_not_smoke(
 ):
     """Create the FlatBuffer NamedTuple, and check that it is pmap-able and does not smoke."""
 
-    add_batch_size = int(min_length + 5)
     buffer = flat_buffer.make_flat_buffer(
-        max_length, min_length, sample_batch_size, False, add_batch_size
+        max_length, min_length, sample_batch_size, False, add_batch_size=min_length
     )
 
     # Initialise the buffer's state.
@@ -236,7 +235,7 @@ def test_flat_replay_buffer_does_not_smoke(
     # Now fill the buffer above its minimum length.
 
     fake_batch = jax.pmap(get_fake_batch, static_broadcasted_argnums=1)(
-        fake_transition_per_device, add_batch_size
+        fake_transition_per_device, min_length
     )
     # Add two items thereby giving a single transition.
     state = jax.pmap(buffer.add)(state, fake_batch)
