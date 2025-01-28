@@ -491,6 +491,28 @@ def prioritised_add(
 
     return state
 
+def _handle_invalid_indices_and_priorities(sampled_item_indices : Array, priorities : Array, valid_mask : Array):
+    """We handle the invalid draws by replacing them with the single index in this batch 
+    that has the highest priority.  This is a workaround in a pure functional setting 
+    (no while-loop re-sampling)."""
+    
+    # Mask out the invalid priorities
+    priorities *= valid_mask
+    
+    # Find the max priority item in the batch
+    max_idx_in_batch = jnp.argmax(priorities)
+    
+    # Select the fallback values
+    fallback_sampled_index = sampled_item_indices[max_idx_in_batch]
+    fallback_priority = priorities[max_idx_in_batch]
+    
+    # Replace non-valid values with the fallback values
+    final_sampled_indices = jnp.where(
+        valid_mask, sampled_item_indices, fallback_sampled_index
+    )
+    final_priorities = jnp.where(valid_mask, priorities, fallback_priority)
+    
+    return final_sampled_indices, final_priorities
 
 def prioritised_sample(
     state: PrioritisedTrajectoryBufferState[Experience],
@@ -549,20 +571,10 @@ def prioritised_sample(
     valid_mask = jax.vmap(check_valid)(
         batch_indices, time_indices
     )  # shape [batch_size], bool
-
-    # Mask out the invalid priorities
-    priorities *= valid_mask
-
-    # We handle the invalid draws by replacing them with the single index in this batch
-    # that has the highest priority.  This is a workaround in a pure functional
-    # setting (no while-loop re-sampling).
-    max_idx_in_batch = jnp.argmax(priorities)
-    fallback_sampled_index = sampled_item_indices[max_idx_in_batch]
-    fallback_priority = priorities[max_idx_in_batch]
-    final_sampled_indices = jnp.where(
-        valid_mask, sampled_item_indices, fallback_sampled_index
-    )
-    final_priorities = jnp.where(valid_mask, priorities, fallback_priority)
+    
+    # Deal with invalid samples
+    final_sampled_indices, final_priorities = _handle_invalid_indices_and_priorities(sampled_item_indices,priorities, valid_mask)
+    
 
     # Get the actual trajectories
     final_trajectories = _get_sample_trajectories(

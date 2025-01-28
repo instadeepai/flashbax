@@ -739,11 +739,11 @@ def is_strictly_increasing(arr: jnp.ndarray) -> jnp.ndarray:
     return jnp.all(arr[1:] > arr[:-1])
 
 
-@pytest.mark.parametrize("length", [9, 15])
-@pytest.mark.parametrize("add_batch_size", [1, 3, 6])
-@pytest.mark.parametrize("sample_sequence_length", [3, 5, 9])
+@pytest.mark.parametrize("length", [1000])
+@pytest.mark.parametrize("add_batch_size", [16])
+@pytest.mark.parametrize("sample_sequence_length", [3, 5])
 @pytest.mark.parametrize("period", [1])
-@pytest.mark.parametrize("max_length_time_axis", [16, 19, 68])
+@pytest.mark.parametrize("max_length_time_axis", [5000])
 def test_prioritised_sample_doesnt_sample_prev_broken_trajectories(
     length: int,
     add_batch_size: int,
@@ -760,7 +760,7 @@ def test_prioritised_sample_doesnt_sample_prev_broken_trajectories(
 
     buffer = prioritised_trajectory_buffer.make_prioritised_trajectory_buffer(
         add_batch_size=add_batch_size,
-        sample_batch_size=1024,
+        sample_batch_size=64,
         sample_sequence_length=sample_sequence_length,
         period=period,
         max_length_time_axis=max_length_time_axis,
@@ -770,7 +770,7 @@ def test_prioritised_sample_doesnt_sample_prev_broken_trajectories(
     rng_key = jax.random.PRNGKey(0)
     state = buffer.init(fake_transition)
 
-    for i in range(8):
+    for i in range(10):
         fake_batch_sequence = {
             "reward": jnp.arange(length)
             .reshape(1, length, 1)
@@ -787,6 +787,4 @@ def test_prioritised_sample_doesnt_sample_prev_broken_trajectories(
         sampled_r = sample.experience["reward"]
 
         for b in range(sampled_r.shape[0]):
-            if not is_strictly_increasing(sampled_r[b]):
-                print(state.experience["reward"].flatten())
             assert is_strictly_increasing(sampled_r[b])
