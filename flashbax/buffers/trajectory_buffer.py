@@ -88,9 +88,9 @@ def init(
             been added yet.
     """
     # Set experience value to be empty.
-    experience = jax.tree_map(jnp.empty_like, experience)
+    experience = jax.tree.map(jnp.empty_like, experience)
     # Broadcast to [add_batch_size, max_length_time_axis]
-    experience = jax.tree_map(
+    experience = jax.tree.map(
         lambda x: jnp.broadcast_to(
             x[None, None, ...], (add_batch_size, max_length_time_axis, *x.shape)
         ),
@@ -141,7 +141,7 @@ def add(
     indices = (jnp.arange(seq_len) + state.current_index) % max_length_time_axis
 
     # Update the buffer state.
-    new_experience = jax.tree_map(
+    new_experience = jax.tree.map(
         lambda exp_field, batch_field: exp_field.at[:, indices].set(batch_field),
         state.experience,
         batch,
@@ -227,7 +227,7 @@ def sample(
         physical_start[:, None] + jnp.arange(sequence_length)
     ) % max_length_time_axis
 
-    batch_trajectory = jax.tree_map(
+    batch_trajectory = jax.tree.map(
         lambda x: x[sampled_batch_indices[:, None], traj_time_indices],
         state.experience,
     )
