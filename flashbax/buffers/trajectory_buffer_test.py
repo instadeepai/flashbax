@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from copy import deepcopy
 
 import chex
@@ -326,89 +325,68 @@ def test_trajectory_buffer_does_not_smoke(
     )
 
 
-@pytest.mark.parametrize("sample_sequence_length", [2, 3, 4])
-@pytest.mark.parametrize("add_batch_size", [1, 2, 3])
-def test_uniform_index_cal(
-    fake_transition: chex.ArrayTree,
-    sample_batch_size: int,
-    max_length: int,
-    rng_key: chex.PRNGKey,
+def is_strictly_increasing(arr: jnp.ndarray) -> jnp.ndarray:
+    """
+    Returns a JAX boolean scalar (True/False) indicating whether `arr`
+    is strictly increasing (arr[i] > arr[i-1] for all i).
+    """
+    # If arr has 0 or 1 elements, it's trivially increasing.
+    if arr.shape[0] <= 1:
+        return jnp.bool_(True)
+    # Otherwise, check that every adjacent difference is positive.
+    return jnp.all(arr[1:] > arr[:-1])
+
+
+@pytest.mark.parametrize("add_length", [4, 9, 13])
+@pytest.mark.parametrize("add_batch_size", [2])
+@pytest.mark.parametrize("sample_sequence_length", [3, 4, 9, 13])
+@pytest.mark.parametrize("period", [1, 2, 3, 4, 5])
+@pytest.mark.parametrize("max_length_time_axis", [13, 16, 26, 39])
+def test_prioritised_sample_doesnt_sample_prev_broken_trajectories(
+    add_length: int,
     add_batch_size: int,
     sample_sequence_length: int,
-):
-    # We enforce a period of 1 so we can deterministically calculate the indices that
-    # should be allowed
-    sample_period = 1
+    period: int,
+    max_length_time_axis: int,
+) -> None:
+    """Test to ensure that `sample` avoids including rewards from broken
+    trajectories.
+    """
+    fake_transition = {"reward": jnp.array([1])}
+
+    offset = jnp.arange(add_batch_size).reshape(add_batch_size, 1, 1) * 1000
 
     buffer = trajectory_buffer.make_trajectory_buffer(
-        max_length_time_axis=max_length,
-        min_length_time_axis=sample_sequence_length,
-        sample_batch_size=sample_batch_size,
         add_batch_size=add_batch_size,
+        sample_batch_size=2048,
         sample_sequence_length=sample_sequence_length,
-        period=sample_period,
+        period=period,
+        max_length_time_axis=max_length_time_axis,
+        min_length_time_axis=sample_sequence_length,
     )
+    buffer_init = jax.jit(buffer.init)
+    buffer_add = jax.jit(buffer.add)
+    buffer_sample = jax.jit(buffer.sample)
 
-    state = buffer.init(fake_transition)
+    rng_key = jax.random.PRNGKey(0)
+    state = buffer_init(fake_transition)
 
-    fake_batch_sequence = get_fake_batch_sequence(
-        fake_transition, add_batch_size, sample_sequence_length
-    )
+    for i in range(12):
+        fake_batch_sequence = {
+            "reward": jnp.arange(add_length)
+            .reshape(1, add_length, 1)
+            .repeat(add_batch_size, axis=0)
+            + offset
+            + add_length * i
+        }
+        state = buffer_add(state, fake_batch_sequence)
 
-    state = buffer.add(state, fake_batch_sequence)
+        rng_key, rng_key1 = jax.random.split(rng_key)
 
-    assert buffer.can_sample(state)
-    rng_key, subkey = jax.random.split(rng_key)
-    item_indices = trajectory_buffer.calculate_uniform_item_indices(
-        state,
-        subkey,
-        sample_batch_size,
-        sample_sequence_length,
-        sample_period,
-        add_batch_size,
-        max_length,
-    )
-    # We check the initial add
-    check_array = jnp.zeros_like(item_indices)
-    for i in range(add_batch_size):
-        check_array += item_indices == max_length * i
+        if buffer.can_sample(state):
+            sample = buffer_sample(state, rng_key1)
 
-    assert jnp.all(check_array)
+            sampled_r = sample.experience["reward"]
 
-    state = buffer.add(state, fake_batch_sequence)
-    rng_key, subkey = jax.random.split(rng_key)
-    item_indices = trajectory_buffer.calculate_uniform_item_indices(
-        state,
-        subkey,
-        sample_batch_size,
-        sample_sequence_length,
-        sample_period,
-        add_batch_size,
-        max_length,
-    )
-    # We check the second add
-    check_array = jnp.zeros_like(item_indices)
-    for i in range(sample_sequence_length + 1):
-        for j in range(add_batch_size):
-            check_array += item_indices == max_length * j + i
-
-    assert jnp.all(check_array)
-
-    while not state.is_full:
-        state = buffer.add(state, fake_batch_sequence)
-
-    invalid_indices = trajectory_buffer.get_invalid_indices(
-        state, sample_sequence_length, sample_period, add_batch_size, max_length
-    )
-    rng_key, subkey = jax.random.split(rng_key)
-    item_indices = trajectory_buffer.calculate_uniform_item_indices(
-        state,
-        subkey,
-        sample_batch_size,
-        sample_sequence_length,
-        sample_period,
-        add_batch_size,
-        max_length,
-    )
-    # We check that the invalid indices are not sampled
-    assert jnp.all(item_indices != invalid_indices.flatten()[:, jnp.newaxis])
+            for b in range(sampled_r.shape[0]):
+                assert is_strictly_increasing(sampled_r[b])
