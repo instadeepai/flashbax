@@ -425,7 +425,7 @@ def check_index_calc(
     (
         priority_indices,
         priority_values,
-    ) = prioritised_trajectory_buffer._get_item_indices_and_priorities(
+    ) = prioritised_trajectory_buffer.calculate_item_indices_and_priorities(
         state,
         sample_sequence_length,
         sample_period,
@@ -725,66 +725,3 @@ def test_item_and_priority_calculation_case5(
         expected_priority_indices,
         expected_priority_values,
     )
-
-
-def is_strictly_increasing(arr: jnp.ndarray) -> jnp.ndarray:
-    """
-    Returns a JAX boolean scalar (True/False) indicating whether `arr`
-    is strictly increasing (arr[i] > arr[i-1] for all i).
-    """
-    # If arr has 0 or 1 elements, it's trivially increasing.
-    if arr.shape[0] <= 1:
-        return jnp.bool_(True)
-    # Otherwise, check that every adjacent difference is positive.
-    return jnp.all(arr[1:] > arr[:-1])
-
-
-@pytest.mark.parametrize("length", [1000])
-@pytest.mark.parametrize("add_batch_size", [16])
-@pytest.mark.parametrize("sample_sequence_length", [3, 5])
-@pytest.mark.parametrize("period", [1])
-@pytest.mark.parametrize("max_length_time_axis", [5000])
-def test_prioritised_sample_doesnt_sample_prev_broken_trajectories(
-    length: int,
-    add_batch_size: int,
-    sample_sequence_length: int,
-    period: int,
-    max_length_time_axis: int,
-) -> None:
-    """Test to ensure that `sample` avoids including rewards from broken
-    trajectories.
-    """
-    fake_transition = {"reward": jnp.array([1])}
-
-    offset = jnp.arange(add_batch_size).reshape(add_batch_size, 1, 1) * 1000
-
-    buffer = prioritised_trajectory_buffer.make_prioritised_trajectory_buffer(
-        add_batch_size=add_batch_size,
-        sample_batch_size=64,
-        sample_sequence_length=sample_sequence_length,
-        period=period,
-        max_length_time_axis=max_length_time_axis,
-        min_length_time_axis=sample_sequence_length,
-    )
-
-    rng_key = jax.random.PRNGKey(0)
-    state = buffer.init(fake_transition)
-
-    for i in range(10):
-        fake_batch_sequence = {
-            "reward": jnp.arange(length)
-            .reshape(1, length, 1)
-            .repeat(add_batch_size, axis=0)
-            + offset
-            + length * i
-        }
-        state = buffer.add(state, fake_batch_sequence)
-
-        rng_key, rng_key1 = jax.random.split(rng_key)
-
-        sample = buffer.sample(state, rng_key1)
-
-        sampled_r = sample.experience["reward"]
-
-        for b in range(sampled_r.shape[0]):
-            assert is_strictly_increasing(sampled_r[b])

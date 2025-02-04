@@ -46,6 +46,7 @@ from flashbax.buffers.trajectory_buffer import (
     TrajectoryBufferSample,
     TrajectoryBufferState,
     can_sample,
+    get_invalid_indices,
     validate_trajectory_buffer_args,
 )
 
@@ -62,23 +63,16 @@ SET_BATCH_FN = {
     "cpu": sum_tree.set_batch_scan,
 }
 
-# The terminology in this code can be confusing
-# The main points to understand is the concept of 'items' vs 'data'
-# Items refer to each individual subsequence that can be sampled where as
-# data refers to the actual data stored in the buffer.
-
 
 @dataclass(frozen=True)
 class PrioritisedTrajectoryBufferState(TrajectoryBufferState, Generic[Experience]):
     """State of the prioritised trajectory replay buffer.
 
-    sum_tree_state: `SumTree`  storing the priorities of the buffer, used for prioritised sampling
+    priority_state: `SumTree`  storing the priorities of the buffer, used for prioritised sampling
         of the indices corresponding to different subsequences.
-    insert_count: the number of times a data point has been inserted into a cell.
     """
 
-    sum_tree_state: SumTreeState
-    insert_count: Array
+    priority_state: SumTreeState
 
 
 @dataclass(frozen=True)
@@ -96,38 +90,11 @@ class PrioritisedTrajectoryBufferSample(TrajectoryBufferSample, Generic[Experien
     priorities: Probabilities
 
 
-def get_num_items_per_row(max_length_time_axis: int, period: int) -> int:
-    """This calculates the number of 'items' in a row of the data buffer."""
-    return int(max_length_time_axis // period)
-
-
-def get_total_num_items(
-    max_length_time_axis: int, period: int, add_batch_size: int
-) -> int:
-    """This calculates the number of possible unique subsequences
-    that can be sampled in the entire buffer."""
-    return int(get_num_items_per_row(max_length_time_axis, period) * add_batch_size)
-
-
 def get_sum_tree_capacity(
     max_length_time_axis: int, period: int, add_batch_size: int
 ) -> int:
     """Get the capacity of the sum tree."""
-    return get_total_num_items(max_length_time_axis, period, add_batch_size)
-
-
-def item_index_to_batch_and_time_index(
-    item_indices: Array, period: int, max_length_time_axis: int
-) -> Tuple[Array, Array]:
-    """This converts from 'item' index which has a range of 0
-    to 'get_num_items' into the batch and time index of the actual data storage."""
-
-    # Convert the item indices to the indices of the data buffer
-    flat_indices = item_indices * period
-    batch_indices = flat_indices // max_length_time_axis
-    time_indices = flat_indices % max_length_time_axis
-
-    return batch_indices, time_indices
+    return int((max_length_time_axis // period) * add_batch_size)
 
 
 def prioritised_init(
@@ -165,132 +132,15 @@ def prioritised_init(
 
     # The size of the sum tree is the number of possible items
     # based on the period and row length. This is multiplied by the
-    # number of rows.
+    # number of rows. If the buffer is not using prioritised sampling
+    # then the size is 0.
     sum_tree_size = get_sum_tree_capacity(max_length_time_axis, period, add_batch_size)
-    sum_tree_state = sum_tree.init(sum_tree_size)
+    priority_state = sum_tree.init(sum_tree_size)
 
-    # Initialise the insert count.
-    # This is a useful measure to check for overwritten subsequences.
-    insert_count = jnp.zeros((add_batch_size, max_length_time_axis))
-
-    return PrioritisedTrajectoryBufferState(
-        sum_tree_state=sum_tree_state, insert_count=insert_count, **state
-    )  # type: ignore
+    return PrioritisedTrajectoryBufferState(priority_state=priority_state, **state)  # type: ignore
 
 
-def _get_prev_valid_data_idx(
-    max_length_time_axis: int,
-    max_subsequence_data_index: int,
-    sample_sequence_length: int,
-    state: PrioritisedTrajectoryBufferState,
-) -> Array:
-    """
-    Get the index of the previous valid data cell in the buffer.
-
-    Args:
-        max_length_time_axis: Maximum length of the buffer along the time axis.
-        max_subsequence_data_index: Maximum index of the data buffer.
-        sample_sequence_length: Length of the sequence that will be sampled from the buffer.
-        state: Buffer state.
-
-    Returns:
-        The index of the previous valid data cell in the buffer.
-    """
-    # We get the index of the previous valid timestep.
-    # By valid, it means we could sample from this index and return a
-    # contiguous trajectory that has not been broken partially.
-    previous_valid_data_index = state.current_index - sample_sequence_length
-    # If full, we modulo the index by the max length of the buffer to ensure that
-    # it wraps around. If we do not have a full buffer, we ensure that it is
-    # not below -1 where -1 essentially means that we have no valid data index
-    previous_valid_data_index = jnp.where(
-        state.is_full,
-        previous_valid_data_index % max_length_time_axis,
-        jnp.maximum(previous_valid_data_index, -1),
-    )
-    # We ensure that this index is not above the maximum mappable item index of the buffer.
-    # The reason is because there is no 'item' that is above the period divisible max length axis.
-    previous_valid_data_index = jnp.minimum(
-        previous_valid_data_index, max_subsequence_data_index
-    )
-    return previous_valid_data_index
-
-
-def _get_starting_item_idx(
-    max_length_time_axis: int,
-    period: int,
-    previous_valid_data_index: Array,
-    state: PrioritisedTrajectoryBufferState,
-) -> Array:
-    """
-    Get the starting 'item' index of the items that will be added to the buffer.
-
-    Args:
-        max_length_time_axis: Maximum length of the buffer along the time axis.
-        period: The period refers to the interval between sampled sequences. It serves to regulate
-            how much overlap there is between the trajectories that are sampled. To understand the
-            degree of overlap, you can calculate it as the difference between the
-            sample_sequence_length and the period. For instance, if you set period=1, it means that
-            trajectories will be sampled uniformly with the potential for any degree of overlap. On
-            the other hand, if period is equal to sample_sequence_length - 1, then trajectories can
-            be sampled in a way where only the first and last timesteps overlap with each other.
-            This helps you control the extent of overlap between consecutive sequences in your
-            sampling process.
-        previous_valid_data_index: Previous valid data index.
-        state: Buffer state.
-
-    Returns:
-        The starting priority item index of the items that will be added to the buffer.
-    """
-    # We then convert the data index into its corresponding 'item' index.
-    # and add 1 since we are referring to the priority buffer item where the new data will be
-    # added.
-    starting_item_index = (previous_valid_data_index // period) + 1
-    # If full, we mod this index by the maximum length of the 'item' buffer (not the data buffer)
-    # otherwise we ensure that it is not negative. The latter ensures that we
-    # always start with a valid item index.
-    starting_item_index = jnp.where(
-        state.is_full,
-        starting_item_index % get_num_items_per_row(max_length_time_axis, period),
-        jnp.maximum(starting_item_index, 0),
-    )
-    return starting_item_index
-
-
-def _get_ending_data_idx(
-    add_sequence_length: int,
-    max_length_time_axis: int,
-    sample_sequence_length: int,
-    state: PrioritisedTrajectoryBufferState,
-) -> Array:
-    """
-    Get the ending data index of the items that will be added to the buffer.
-    Args:
-        add_sequence_length: Length of the sequence that will be added to the buffer.
-        max_length_time_axis: Maximum length of the buffer along the time axis.
-        sample_sequence_length: Length of the sequence that will be sampled from the buffer.
-        state: Buffer state.
-
-    Returns:
-        The ending data index of the items that will be added to the buffer.
-    """
-    # We then get the final index in the item buffer based on how many items
-    # were created.
-    ending_data_index = (
-        state.current_index + add_sequence_length - sample_sequence_length
-    )
-    # If full, we modulo the index by the max length of the buffer to ensure that
-    # it wraps around. Otherwise, if the buffer is not full we ensure the ending data index is non
-    # negative
-    ending_data_index = jnp.where(
-        state.is_full,
-        ending_data_index % max_length_time_axis,
-        jnp.maximum(ending_data_index, 0),
-    )
-    return ending_data_index
-
-
-def _get_item_indices_and_priorities(
+def calculate_item_indices_and_priorities(
     state: PrioritisedTrajectoryBufferState,
     sample_sequence_length: int,
     period: int,
@@ -298,7 +148,8 @@ def _get_item_indices_and_priorities(
     add_batch_size: int,
     max_length_time_axis: int,
 ) -> Tuple[Array, Array]:
-    """Calculate the indices and priority values of the items that will be added to
+    """
+    Calculate the indices and priority values of the items that will be added to
     the prioritised buffer.
 
     Args:
@@ -321,34 +172,30 @@ def _get_item_indices_and_priorities(
 
     Returns:
         item_indices: Indices of the items that will be added to the buffer.
-        item_values: Priority values of the items that will be added to the buffer."""
+        item_values: Priority values of the items that will be added to the buffer.
+    """
+    # We get the maximum length of the buffer that is divisible by the period, and then
+    # subtract 1 to get the maximum index of the buffer. This is so that we can
+    # ensure that our index is never above the maximum item index.
+    max_divisible_length = max_length_time_axis - (max_length_time_axis % period)
+    max_subsequence_data_index = max_divisible_length - 1
 
-    # Due to supporting any period, it is possible that there are strange division issues
-    # Thus we find what the largest max_length_axis that is divisible by the period.
-    max_divisible_by_period_length = max_length_time_axis - (
-        max_length_time_axis % period
-    )
-    # Knowing this, we simply minus 1 to get the index of the last possible cell.
-    max_subsequence_data_index = max_divisible_by_period_length - 1
-
-    # Get the previous data index value that is valid to start sampling from.
-    previous_valid_data_index = _get_prev_valid_data_idx(
+    previous_valid_data_index = get_prev_valid_data_idx(
         max_length_time_axis, max_subsequence_data_index, sample_sequence_length, state
     )
-    # Get the starting index of the 'item' buffer/array that we will start writing from
-    starting_item_index = _get_starting_item_idx(
+
+    starting_priority_item_index = _get_starting_priority_item_idx(
         max_length_time_axis, period, previous_valid_data_index, state
     )
 
-    # Get the ending data index
     ending_data_index = _get_ending_data_idx(
         add_sequence_length, max_length_time_axis, sample_sequence_length, state
     )
-    # We ensure that this index is not above the maximum mappable data index of the buffer.
-    ending_data_index = jnp.minimum(ending_data_index, max_subsequence_data_index)
 
-    # We now convert the data index to an item index
-    ending_item_index = (ending_data_index // period) + 1
+    # We ensure that this index is not above the maximum mappable item index of the buffer.
+    ending_priority_item_index = (
+        jnp.minimum(ending_data_index, max_subsequence_data_index) // period
+    ) + 1
 
     # We get the maximum number of items that can be created based on
     # the number of steps added and the period.
@@ -356,41 +203,206 @@ def _get_item_indices_and_priorities(
 
     # We get the actual number of items that will be created and use for masking.
     actual_num_items_given_full = (
-        ending_item_index - starting_item_index
-    ) % get_num_items_per_row(max_length_time_axis, period)
+        ending_priority_item_index - starting_priority_item_index
+    ) % (max_length_time_axis // period)
     # If not full, we simply take the maximum
     actual_num_items_given_not_full = jnp.maximum(
-        0, (ending_item_index - starting_item_index)
+        0, (ending_priority_item_index - starting_priority_item_index)
     )
 
     actual_num_items = jax.lax.select(
         state.is_full, actual_num_items_given_full, actual_num_items_given_not_full
     )
 
-    # We then get all the indices of the items that will be created.
-    item_indices = (
-        jnp.arange(max_num_items) + starting_item_index
-    ) % get_num_items_per_row(max_length_time_axis, period)
-    # We add the row offset to get the item indices for all rows not just the first one.
-    item_indices = item_indices + jnp.arange(add_batch_size)[
-        :, None
-    ] * get_num_items_per_row(max_length_time_axis, period)
-    # Flatten the indices to a single dimension to use in the item array.
-    item_indices = item_indices.flatten()
-    # Create the valid mask
-    valid_mask = jnp.where(jnp.arange(max_num_items) >= actual_num_items, 0, 1)
+    priority_indices = _get_priority_indices(
+        add_batch_size,
+        max_length_time_axis,
+        max_num_items,
+        period,
+        starting_priority_item_index,
+    )
 
+    # Get a mask indicating which indices are true items and which are padding.
+    priority_mask = jnp.where(jnp.arange(max_num_items) >= actual_num_items, 0, 1)
+
+    unnormalised_probability = _get_unnormalised_prob(
+        add_batch_size, max_num_items, priority_mask, state
+    )
+
+    return priority_indices, unnormalised_probability
+
+
+def _get_unnormalised_prob(
+    add_batch_size: int,
+    max_num_items: int,
+    priority_mask: Array,
+    state: PrioritisedTrajectoryBufferState,
+) -> Array:
+    """
+    Get the unnormalised probability of the items that will be added to the buffer.
+
+    Args:
+        add_batch_size: Batch size of experience added to the buffer's state using the `add`
+        max_num_items:  Maximum number of items that can be created
+        priority_mask: Mask indicating which indices are true items and which are padding.
+        state: Buffer state
+
+    Returns:
+        Unnormalised probability of the items that will be added to the buffer.
+    """
     # We set the priority of the newly created items to the maximum priority however
     # we set masked items to 0.
-    new_priorities = jnp.full(
-        (max_num_items,), fill_value=state.sum_tree_state.max_recorded_priority
+    unnormalised_probability = (
+        jnp.full((max_num_items,), state.priority_state.max_recorded_priority)
+        * priority_mask[None]
     )
-    new_priorities = new_priorities * valid_mask[None]
+    unnormalised_probability = jnp.repeat(
+        unnormalised_probability, add_batch_size, axis=0
+    ).flatten()
+    return unnormalised_probability
 
-    # We repeat the new priorities for each row
-    new_priorities = jnp.repeat(new_priorities, add_batch_size, axis=0).flatten()
 
-    return item_indices, new_priorities
+def _get_priority_indices(
+    add_batch_size: int,
+    max_length_time_axis: int,
+    max_num_items: int,
+    period: int,
+    starting_priority_item_index: Array,
+) -> Array:
+    """
+    Get the priority indices of the items that will be added to the buffer.
+    Args:
+        add_batch_size: Batch size of experience added to the buffer's state using the `add`
+        max_length_time_axis: Maximum length of the buffer along the time axis.
+        max_num_items: Maximum number of items that can be created
+        period: The period refers to the interval between sampled sequences. It serves to regulate
+            how much overlap there is between the trajectories that are sampled. To understand the
+            degree of overlap, you can calculate it as the difference between the
+            sample_sequence_length and the period. For instance, if you set period=1, it means that
+            trajectories will be sampled uniformly with the potential for any degree of overlap. On
+            the other hand, if period is equal to sample_sequence_length - 1, then trajectories can
+            be sampled in a way where only the first and last timesteps overlap with each other.
+            This helps you control the extent of overlap between consecutive sequences in your
+            sampling process.
+        starting_priority_item_index: Starting priority item index
+
+    Returns:
+        The latest priority indices of the items that will be added to the buffer.
+    """
+    # We then get all the indices of the items that will be created.
+    priority_indices = (jnp.arange(max_num_items) + starting_priority_item_index) % (
+        max_length_time_axis // period
+    )
+    # We broadcast and add the max_length_time_axis to each index to reference each newly
+    # created item in each add_batch row.
+    priority_indices = priority_indices + jnp.arange(add_batch_size)[:, None] * (
+        max_length_time_axis // period
+    )
+    # Flatten the indices to a single dimension to use in the priority array.
+    priority_indices = priority_indices.flatten()
+    return priority_indices
+
+
+def _get_ending_data_idx(
+    add_sequence_length: int,
+    max_length_time_axis: int,
+    sample_sequence_length: int,
+    state: PrioritisedTrajectoryBufferState,
+) -> Array:
+    """
+    Get the ending data index of the items that will be added to the buffer.
+    Args:
+        add_sequence_length: Length of the sequence that will be added to the buffer.
+        max_length_time_axis: Maximum length of the buffer along the time axis.
+        sample_sequence_length: Length of the sequence that will be sampled from the buffer.
+        state: Buffer state.
+
+    Returns:
+        The ending data index of the items that will be added to the buffer.
+    """
+    # We then get the final index in priority item index based on how many items
+    # were created.
+    ending_data_index = (
+        state.current_index + add_sequence_length - sample_sequence_length
+    )
+    # If full, we modulo the index by the max length of the buffer to ensure that
+    # it wraps around
+    ending_data_index = jnp.where(
+        state.is_full, ending_data_index % max_length_time_axis, ending_data_index
+    )
+    return ending_data_index
+
+
+def _get_starting_priority_item_idx(
+    max_length_time_axis: int,
+    period: int,
+    previous_valid_data_index: Array,
+    state: PrioritisedTrajectoryBufferState,
+) -> Array:
+    """
+    Get the starting priority item index of the items that will be added to the buffer.
+
+    Args:
+        max_length_time_axis: Maximum length of the buffer along the time axis.
+        period: The period refers to the interval between sampled sequences. It serves to regulate
+            how much overlap there is between the trajectories that are sampled. To understand the
+            degree of overlap, you can calculate it as the difference between the
+            sample_sequence_length and the period. For instance, if you set period=1, it means that
+            trajectories will be sampled uniformly with the potential for any degree of overlap. On
+            the other hand, if period is equal to sample_sequence_length - 1, then trajectories can
+            be sampled in a way where only the first and last timesteps overlap with each other.
+            This helps you control the extent of overlap between consecutive sequences in your
+            sampling process.
+        previous_valid_data_index: Previous valid data index.
+        state: Buffer state.
+
+    Returns:
+        The starting priority item index of the items that will be added to the buffer.
+    """
+    # We then convert the data index into the item index.
+    starting_priority_item_index = (previous_valid_data_index // period) + 1
+    # If full, we mod this index by the maximum length of the item buffer (not the data buffer)
+    # otherwise we ensure that it is not negative.
+    starting_priority_item_index = jnp.where(
+        state.is_full,
+        starting_priority_item_index % (max_length_time_axis // period),
+        jnp.maximum(starting_priority_item_index, 0),
+    )
+    return starting_priority_item_index
+
+
+def get_prev_valid_data_idx(
+    max_length_time_axis: int,
+    max_subsequence_data_index: int,
+    sample_sequence_length: int,
+    state: PrioritisedTrajectoryBufferState,
+) -> Array:
+    """
+    Get the index of the previous valid timestep in the buffer.
+
+    Args:
+        max_length_time_axis: Maximum length of the buffer along the time axis.
+        max_subsequence_data_index: Maximum index of the data buffer.
+        sample_sequence_length: Length of the sequence that will be sampled from the buffer.
+        state: Buffer state.
+
+    Returns:
+        The index of the previous valid timestep in the buffer.
+    """
+    # We get the index of the previous valid timestep.
+    previous_valid_data_index = state.current_index - sample_sequence_length
+    # If full, we modulo the index by the max length of the buffer to ensure that
+    # it wraps around
+    previous_valid_data_index = jnp.where(
+        state.is_full,
+        previous_valid_data_index % max_length_time_axis,
+        previous_valid_data_index,
+    )
+    # We ensure that this index is not above the maximum mappable item index of the buffer.
+    previous_valid_data_index = jnp.minimum(
+        previous_valid_data_index, max_subsequence_data_index
+    )
+    return previous_valid_data_index
 
 
 def prioritised_add(
@@ -432,7 +444,7 @@ def prioritised_add(
     chex.assert_tree_shape_prefix(batch, utils.get_tree_shape_prefix(state.experience))
     chex.assert_trees_all_equal_dtypes(batch, state.experience)
 
-    add_sequence_length = utils.get_tree_shape_prefix(batch, n_axes=2)[1]
+    num_steps = utils.get_tree_shape_prefix(batch, n_axes=2)[1]
     add_batch_size, max_length_time_axis = utils.get_tree_shape_prefix(
         state.experience, n_axes=2
     )
@@ -441,78 +453,45 @@ def prioritised_add(
     )
 
     # Calculate index location in the state where we will assign the batch of experience.
-    time_data_indices = (
-        jnp.arange(add_sequence_length) + state.current_index
-    ) % max_length_time_axis
+    indices = (jnp.arange(num_steps) + state.current_index) % max_length_time_axis
 
-    # Update the buffer data.
-    experience = jax.tree_util.tree_map(
-        lambda experience_field, batch_field: experience_field.at[
-            :, time_data_indices
-        ].set(batch_field),
-        state.experience,
-        batch,
-    )
-    # Update the insert count
-    new_insert_count = jax.tree.map(
-        lambda insert_count_field: insert_count_field.at[:, time_data_indices].add(1),
-        state.insert_count,
-    )
-
-    # Now we have to calculate the item indices and priorities of the newly added data.
-    item_indices, item_priorities = _get_item_indices_and_priorities(
+    # Update the priority storage.
+    priority_indices, unnormalised_priorities = calculate_item_indices_and_priorities(
         state,
         sample_sequence_length,
         period,
-        add_sequence_length,
+        num_steps,
         add_batch_size,
         max_length_time_axis,
     )
 
     # Update the sum tree.
-    sum_tree_state = SET_BATCH_FN[device](
-        state.sum_tree_state,
-        item_indices,
-        item_priorities,
+    priority_state = SET_BATCH_FN[device](
+        state.priority_state,
+        priority_indices,
+        unnormalised_priorities,
     )
 
-    # Update the other state metrics
-    new_index = state.current_index + add_sequence_length
+    # Update the buffer state.
+    experience = jax.tree_util.tree_map(
+        lambda experience_field, batch_field: experience_field.at[:, indices].set(
+            batch_field
+        ),
+        state.experience,
+        batch,
+    )
+    new_index = state.current_index + num_steps
     is_full = state.is_full | (new_index >= max_length_time_axis)
     new_index = new_index % max_length_time_axis
-
     state = state.replace(  # type: ignore
         experience=experience,
         current_index=new_index,
         is_full=is_full,
-        sum_tree_state=sum_tree_state,
-        insert_count=new_insert_count,
+        priority_state=priority_state,
     )
 
     return state
 
-def _handle_invalid_indices_and_priorities(sampled_item_indices : Array, priorities : Array, valid_mask : Array):
-    """We handle the invalid draws by replacing them with the single index in this batch 
-    that has the highest priority.  This is a workaround in a pure functional setting 
-    (no while-loop re-sampling)."""
-    
-    # Mask out the invalid priorities
-    priorities *= valid_mask
-    
-    # Find the max priority item in the batch
-    max_idx_in_batch = jnp.argmax(priorities)
-    
-    # Select the fallback values
-    fallback_sampled_index = sampled_item_indices[max_idx_in_batch]
-    fallback_priority = priorities[max_idx_in_batch]
-    
-    # Replace non-valid values with the fallback values
-    final_sampled_indices = jnp.where(
-        valid_mask, sampled_item_indices, fallback_sampled_index
-    )
-    final_priorities = jnp.where(valid_mask, priorities, fallback_priority)
-    
-    return final_sampled_indices, final_priorities
 
 def prioritised_sample(
     state: PrioritisedTrajectoryBufferState[Experience],
@@ -542,49 +521,50 @@ def prioritised_sample(
     Returns:
         A batch of experience.
     """
-    _, max_length_time_axis = utils.get_tree_shape_prefix(state.experience, n_axes=2)
-
-    # Sample from the sum tree
-    sampled_item_indices = sum_tree.stratified_sample(
-        state.sum_tree_state, batch_size, rng_key
+    add_batch_size, max_length_time_axis = utils.get_tree_shape_prefix(
+        state.experience, n_axes=2
     )
 
-    # Get the priorities at these indices
-    priorities = sum_tree.get(state.sum_tree_state, sampled_item_indices)
+    # Sample items from the priority array.
+    item_indices = sum_tree.stratified_sample(state.priority_state, batch_size, rng_key)
 
-    # Convert flat (item) indices -> row/col indices for buffer
-    batch_indices, time_indices = item_index_to_batch_and_time_index(
-        sampled_item_indices, period, max_length_time_axis
+    trajectory = _get_sample_trajectories(
+        item_indices, max_length_time_axis, period, sequence_length, state
     )
 
-    # Check validity: if any cell in [start_t..start_t+(sequence_length-1)] has
-    # insert_count[b, cell] != insert_count[b, start_t], then it is invalid.
-    # We'll do an all-equal check:
-    def check_valid(b, start_t):
-        ts = (start_t + jnp.arange(sequence_length)) % max_length_time_axis
-        ref_count = state.insert_count[b, start_t]
-        counts = state.insert_count[b, ts]
-        # valid if all counts == ref_count
-        return jnp.all(counts == ref_count)
+    # There is an edge case where experience from the sum-tree has probability 0.
+    # To deal with this we overwrite indices with probability zero with
+    # the index that is the most probable within the batch of indices. This slightly biases
+    # the sampling, however as this is an edge case it is unlikely to have a significant effect.
+    priorities = sum_tree.get(state.priority_state, item_indices)
+    most_probable_in_batch_index = jnp.argmax(priorities)
+    item_indices = jnp.where(
+        priorities == 0, item_indices[most_probable_in_batch_index], item_indices
+    )
+    priorities = jnp.where(
+        priorities == 0, priorities[most_probable_in_batch_index], priorities
+    )
 
-    # vectorize over each sample
-    valid_mask = jax.vmap(check_valid)(
-        batch_indices, time_indices
-    )  # shape [batch_size], bool
-    
-    # Deal with invalid samples
-    final_sampled_indices, final_priorities = _handle_invalid_indices_and_priorities(sampled_item_indices,priorities, valid_mask)
-    
-
-    # Get the actual trajectories
-    final_trajectories = _get_sample_trajectories(
-        final_sampled_indices, max_length_time_axis, period, sequence_length, state
+    # We get the indices of the items that will be invalid when sampling from the buffer state.
+    # If the sampled indices are in the invalid indices, then we replace them with the
+    # most probable index in the batch. As with above this is unlikely to occur.
+    invalid_item_indices = get_invalid_indices(
+        state, sequence_length, period, add_batch_size, max_length_time_axis
+    )
+    invalid_item_indices = invalid_item_indices.flatten()
+    item_indices = jnp.where(
+        jnp.any(item_indices[:, None] == invalid_item_indices, axis=-1),
+        item_indices[most_probable_in_batch_index],
+        item_indices,
+    )
+    priorities = jnp.where(
+        jnp.any(item_indices[:, None] == invalid_item_indices, axis=-1),
+        priorities[most_probable_in_batch_index],
+        priorities,
     )
 
     return PrioritisedTrajectoryBufferSample(
-        experience=final_trajectories,
-        indices=final_sampled_indices,
-        priorities=final_priorities,
+        experience=trajectory, indices=item_indices, priorities=priorities
     )
 
 
@@ -671,10 +651,10 @@ def set_priorities(
     unnormalised_probs = jnp.where(
         priorities == 0, jnp.zeros_like(priorities), priorities**priority_exponent
     )
-    sum_tree_state = SET_BATCH_FN[device](
-        state.sum_tree_state, indices, unnormalised_probs
+    priority_state = SET_BATCH_FN[device](
+        state.priority_state, indices, unnormalised_probs
     )
-    return state.replace(sum_tree_state=sum_tree_state)  # type: ignore
+    return state.replace(priority_state=priority_state)  # type: ignore
 
 
 @dataclass(frozen=True)
