@@ -46,7 +46,6 @@ from flashbax.buffers.trajectory_buffer import (
     TrajectoryBufferSample,
     TrajectoryBufferState,
     can_sample,
-    get_invalid_indices,
     validate_trajectory_buffer_args,
 )
 
@@ -491,6 +490,89 @@ def prioritised_add(
     )
 
     return state
+
+
+def get_invalid_indices(
+    state: TrajectoryBufferState[Experience],
+    sample_sequence_length: int,
+    period: int,
+    add_batch_size: int,
+    max_length_time_axis: int,
+) -> Array:
+    """
+    Get the indices of the items that will be invalid when sampling from the buffer state. This
+    is used to mask out the invalid items when sampling. The indices are in the format of a
+    flattened array and refer to items, not the actual data. To convert item indices into data
+    indices, we would perform the following:
+
+        indices = item_indices * period
+        row_indices = indices // max_length_time_axis
+        time_indices = indices % max_length_time_axis
+
+    Item indices essentially refer to a flattened array picture of the
+    items (i.e. subsequences that can be sampled) in the buffer state.
+
+
+    Args:
+        state: The buffer state.
+        sample_sequence_length: The length of the sequence that will be sampled from the buffer
+            state.
+        period: The period refers to the interval between sampled sequences. It serves to regulate
+            how much overlap there is between the trajectories that are sampled. To understand the
+            degree of overlap, you can calculate it as the difference between the
+            sample_sequence_length and the period. For instance, if you set period=1, it means that
+            trajectories will be sampled uniformly with the potential for any degree of overlap. On
+            the other hand, if period is equal to sample_sequence_length - 1, then trajectories can
+            be sampled in a way where only the first and last timesteps overlap with each other.
+            This helps you control the extent of overlap between consecutive sequences in your
+            sampling process.
+        add_batch_size: The number of trajectories that will be added to the buffer state.
+        max_length_time_axis: The maximum length of the time axis of the buffer state.
+
+    Returns:
+        The indices of the items (with shape : [add_batch_size, num_items]) that will be invalid
+        when sampling from the buffer state.
+    """
+    # We get the max subsequence data index as done in the add function.
+    max_divisible_length = max_length_time_axis - (max_length_time_axis % period)
+    max_subsequence_data_index = max_divisible_length - 1
+    # We get the data index that is at least sample_sequence_length away from the
+    # current index.
+    previous_valid_data_index = (
+        state.current_index - sample_sequence_length
+    ) % max_length_time_axis
+    # We ensure that this index is not above the maximum mappable data index of the buffer.
+    previous_valid_data_index = jnp.minimum(
+        previous_valid_data_index, max_subsequence_data_index
+    )
+    # We then convert the data index into the item index and add one to get the index
+    # of the item that is broken apart.
+    invalid_item_starting_index = (previous_valid_data_index // period) + 1
+    # We then take the modulo of the invalid item index to ensure that it is within the
+    # bounds of the priority array. max_length_time_axis // period is the maximum number
+    # of items/subsequences that can be sampled from the buffer state.
+    invalid_item_starting_index = invalid_item_starting_index % (
+        max_length_time_axis // period
+    )
+
+    # Calculate the maximum number of items/subsequences that can start within a
+    # sample length of data. We add one to account for situations where the max
+    # number of items has been broken. Often, this will unfortunately mask an item
+    # that is valid however this should not be a severe issue as it would be only
+    # one additional item.
+    max_num_invalid_items = (sample_sequence_length // period) + 1
+    # Get the actual indices of the items we cannot sample from.
+    invalid_item_indices = (
+        jnp.arange(max_num_invalid_items) + invalid_item_starting_index
+    ) % (max_length_time_axis // period)
+    # Since items that are broken are broken in the same place in each row, we
+    # broadcast and add the total number of items to each index to reference
+    # the invalid items in each add_batch row.
+    invalid_item_indices = invalid_item_indices + jnp.arange(add_batch_size)[
+        :, None
+    ] * (max_length_time_axis // period)
+
+    return invalid_item_indices
 
 
 def prioritised_sample(
