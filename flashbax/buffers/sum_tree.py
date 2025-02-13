@@ -256,14 +256,14 @@ def set_non_batched(
         value: The value which we assign to the node. This value must be
             nonnegative. Setting value = 0 will cause the element to never be sampled.
 
-    This is not used in practice within the prioritised replay, as it is not vmap-able. However,
-    it is useful for comparisons and testing. See `set_single` and `set_batch` for the functions
-    that we use within the prioritised replay in practice.
     """
     # We get the tree index of the node.
     mapped_index = get_tree_index(state.tree_depth, node_index)
+    # We ensure that if we index out of bounds (which is what we do for padding)
+    # then the node value is zero.
+    node_value = state.nodes.at[mapped_index].get(mode="drop", fill_value=0)
     # We get the delta value for the node.
-    delta_value = value - state.nodes[mapped_index]
+    delta_value = value - node_value
 
     def update_nodes(
         idx: Array, carry: Tuple[Array, Array, Array, Array]
@@ -272,7 +272,7 @@ def set_non_batched(
         nodes, node_index, delta_value, tree_depth = carry
         depth_level = tree_depth - idx
         mapped_index = get_tree_index(depth_level, node_index)
-        nodes = nodes.at[mapped_index].add(delta_value)
+        nodes = nodes.at[mapped_index].add(delta_value, mode="drop")
         node_index //= 2
 
         return (nodes, node_index, delta_value, tree_depth)
@@ -322,15 +322,17 @@ def set_batch_bincount(
     # This is because we want to set the value of the leaf nodes to the 'latest' value
     # in the batch of values and we do not want to add the delta values of all duplicate
     # nodes.
-    new_nodes = state.nodes.at[mapped_indices].set(values)
+    new_nodes = state.nodes.at[mapped_indices].set(values, mode="drop")
     # We calculate the delta values for each node using the original values.
     # We do it like this to deal with duplicates as we want each delta
     # value for duplicates to be identical.
-    delta_values = new_nodes[mapped_indices] - state.nodes[mapped_indices]
+    new_node_values = new_nodes.at[mapped_indices].get(mode="drop", fill_value=0)
+    orig_node_values = state.nodes.at[mapped_indices].get(mode="drop", fill_value=0)
+    delta_values = new_node_values - orig_node_values
     # Determine the counts of the duplicate indices
     index_counts = jnp.bincount(node_indices, length=state.capacity)
     # We get the number of duplicates for each leaf node being updated.
-    divisor = index_counts[node_indices]
+    divisor = index_counts.at[node_indices].get(mode="drop", fill_value=1)
     # We then divide the delta values by the number of duplicates
     # since they are added together in the tree propagation
     # e.g. if two duplicate leafs are being updated - since their delta values are
@@ -348,7 +350,7 @@ def set_batch_bincount(
         nodes, node_indices, delta_values, tree_depth = carry
         depth_level = tree_depth - i
         mapped_indices = get_tree_index(depth_level, node_indices)
-        nodes = nodes.at[mapped_indices].add(delta_values)
+        nodes = nodes.at[mapped_indices].add(delta_values, mode="drop")
         node_indices //= 2
 
         return (nodes, node_indices, delta_values, tree_depth)
