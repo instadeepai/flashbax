@@ -213,7 +213,7 @@ def stratified_sample(
 
 
 def get(state: SumTreeState, node_index: Array) -> Array:
-    """Returns the value of the leaf node corresponding to the index.
+    """Returns the priority value of the leaf node corresponding to the index.
 
     Args:
         state: Current state of the sum-tree.
@@ -224,6 +224,21 @@ def get(state: SumTreeState, node_index: Array) -> Array:
     """
     tree_index = get_tree_index(state.tree_depth, node_index)
     return state.nodes[tree_index]
+
+
+def get_probability(state: SumTreeState, node_index: Array) -> Array:
+    """Returns the probability value of the leaf node corresponding to the index.
+
+    Args:
+        state: Current state of the sum-tree.
+        node_index: The index of the leaf node.
+
+    Returns:
+        The probaility of the leaf node.
+    """
+    tree_index = get_tree_index(state.tree_depth, node_index)
+    probability = state.nodes[tree_index] / _total_priority(state)
+    return probability
 
 
 def get_batch(state: SumTreeState, node_indices: Array) -> Array:

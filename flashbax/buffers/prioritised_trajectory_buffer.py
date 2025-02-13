@@ -84,13 +84,11 @@ class PrioritisedTrajectoryBufferSample(TrajectoryBufferSample, Generic[Experien
 
     Attributes:
         indices: Indices corresponding to the sampled experience.
-        priorities: Unnormalised priorities of the sampled experience. Will be in the form of
-            priority**priority_exponent, where `priority_exponent` is denoted as p
-            and `priority_exponent` as \alpha in the PER paper.
+        probabilities: probabilities of the sampled experience.
     """
 
     indices: Indices
-    priorities: Probabilities
+    probabilities: Probabilities
 
 
 def get_max_divisible_length(max_length_time_axis: int, period: int) -> int:
@@ -186,8 +184,8 @@ def prioritised_init(
     sum_tree_size = get_sum_tree_capacity(max_length_time_axis, period, add_batch_size)
     sum_tree_state = sum_tree.init(sum_tree_size)
 
-    # Set the running index - Ideally int64
-    running_index = jnp.array(0, dtype=jnp.int64)
+    # Set the running index - Ideally int64 but we put as int32
+    running_index = jnp.array(0, dtype=jnp.int32)
 
     return PrioritisedTrajectoryBufferState(  # type: ignore
         sum_tree_state=sum_tree_state,
@@ -419,7 +417,7 @@ def _calculate_new_item_priorities(
     max_length_time_axis: int,
     period: int,
     add_batch_size: int,
-) -> Tuple[Array, Array]:
+) -> Tuple[Priorities, Priorities]:
     """
     Calculate the new priorities for items that have become valid or invalid.
 
@@ -596,14 +594,14 @@ def prioritised_sample(
 
     # Sample items from the sum tree.
     item_indices = sum_tree.stratified_sample(state.sum_tree_state, batch_size, rng_key)
-    priorities = sum_tree.get(state.sum_tree_state, item_indices)
+    probabilities = sum_tree.get_probability(state.sum_tree_state, item_indices)
     # Get the trajectories based on the item indices.
     trajectory = _get_sample_trajectories(
         item_indices, max_length_time_axis, period, sequence_length, state
     )
 
     return PrioritisedTrajectoryBufferSample(
-        experience=trajectory, indices=item_indices, priorities=priorities
+        experience=trajectory, indices=item_indices, probabilities=probabilities
     )
 
 
@@ -668,7 +666,7 @@ def set_priorities(
     Args:
         state: Current buffer state.
         indices: Locations in the buffer to set the priority.
-        priorities: Priority to be set. Commonly this will be abs(td-error).
+        priorities: Priority to be set. Commonly this will be abs(td-error) + eps.
         priority_exponent: Priority exponent for sampling. Equivalent to \alpha in the PER paper.
         period: The period refers to the interval between sampled sequences. It serves to regulate
             how much overlap there is between the trajectories that are sampled. To understand the
@@ -856,10 +854,9 @@ def make_prioritised_trajectory_buffer(
             prev_max_length_time_axis * add_batch_size
             - max_length_time_axis * add_batch_size
         )
-        warnings.warn(
-            f"Setting max_length_time_axis to {max_length_time_axis} to make divisible by "
-            f"period argument. This results in a total reduction in capacity of {size_difference}.",
-            stacklevel=1,
+        print(
+            f"""Setting max_length_time_axis to {max_length_time_axis} to make divisible by
+            period argument. This results in a total reduction in capacity of {size_difference}.""",
         )
 
     init_fn = functools.partial(

@@ -205,8 +205,8 @@ def test_prioritised_sample(
     with pytest.raises(AssertionError):
         chex.assert_trees_all_close(batch1, batch2)
 
-    assert (batch1.priorities > 0).all()
-    assert (batch2.priorities > 0).all()
+    assert (batch1.probabilities > 0).all()
+    assert (batch2.probabilities > 0).all()
 
     # Check correct the shape prefix is correct.
     chex.assert_trees_all_equal_dtypes(
@@ -316,7 +316,7 @@ def test_adjust_priorities(
     )
 
     # Create fake new priorities, and apply the adjustment.
-    new_priorities = jnp.ones_like(batch.priorities) + 10007
+    new_priorities = jnp.ones_like(batch.probabilities) + 10007
     state = prioritised_trajectory_buffer.set_priorities(
         state, batch.indices, new_priorities, priority_exponent, device
     )
@@ -376,11 +376,11 @@ def test_prioritised_trajectory_buffer_does_not_smoke(
         (_DEVICE_COUNT_MOCK, sample_batch_size, sample_sequence_length),
     )
     chex.assert_tree_shape_prefix(
-        batch.priorities, (_DEVICE_COUNT_MOCK, sample_batch_size)
+        batch.probabilities, (_DEVICE_COUNT_MOCK, sample_batch_size)
     )
 
     state = jax.pmap(buffer.set_priorities)(
-        state, batch.indices, jnp.ones_like(batch.priorities)
+        state, batch.indices, jnp.ones_like(batch.probabilities)
     )
 
 
