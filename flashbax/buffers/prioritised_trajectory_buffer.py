@@ -304,7 +304,7 @@ def _get_item_indices_and_mask_in_range(
         max_num_items * period, step=period
     )
     # Calculate from this the mask of valid data positions
-    data_mask = jnp.where(possible_data_indices >= range_end, 0, 1)
+    data_mask = jnp.where(possible_data_indices < range_end, 1, 0)
     # Modulo the data indices to get the correct buffer range
     possible_data_indices = possible_data_indices % max_length_time_axis
     # Divide by period to get the item indices

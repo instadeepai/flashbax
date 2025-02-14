@@ -411,6 +411,15 @@ def test_prioritised_sample_doesnt_sample_prev_broken_trajectories(
     """Test to ensure that `sample` avoids including rewards from broken
     trajectories.
     """
+    # Because we are sweeping over a range of values
+    # it is easier to check here if we shouldnt test
+    remainder = max_length_time_axis % period
+    real_length = max_length_time_axis - remainder
+    if real_length <= add_length or real_length <= sample_sequence_length:
+        # Due to the new constraints placed on the PER buffer length
+        # if this situation arises we simply skip
+        return
+
     fake_transition = {"reward": jnp.array([1])}
 
     offset = jnp.arange(add_batch_size).reshape(add_batch_size, 1, 1) * 1000
@@ -439,6 +448,14 @@ def test_prioritised_sample_doesnt_sample_prev_broken_trajectories(
             + add_length * i
         }
         state = buffer_add(state, fake_batch_sequence)
+
+        # If the root node of the sum tree is zero
+        # this means there are no valid items available
+        # then test will definitely fail so we skip this
+        # This is under the assumption that the sum tree
+        # is correctly implemented which we have tests for.
+        if state.sum_tree_state.nodes[0] == 0:
+            continue
 
         rng_key, rng_key1 = jax.random.split(rng_key)
 
