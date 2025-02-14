@@ -106,9 +106,9 @@ def test_sample(
     with pytest.raises(AssertionError):
         chex.assert_trees_all_close(batch1, batch2)
 
-    # Check that all the corresponding priorities are greater than 0.
-    assert (batch1.priorities > 0).all()
-    assert (batch2.priorities > 0).all()
+    # Check that all the corresponding probabilities are greater than 0.
+    assert (batch1.probabilities > 0).all()
+    assert (batch2.probabilities > 0).all()
 
     # Check dtypes are correct.
     chex.assert_trees_all_equal_dtypes(
@@ -149,16 +149,16 @@ def test_adjust_priorities(
     batch = buffer.sample(state, rng_key1)
 
     # Create fake new priorities, and apply the adjustment.
-    new_priorities = jnp.ones_like(batch.priorities) + 10007
+    new_priorities = jnp.ones_like(batch.probabilities) + 10007
     state = buffer.set_priorities(state, batch.indices, new_priorities)
 
     # Check that this results in the correct changes to the state.
     assert (
-        state.priority_state.max_recorded_priority
+        state.sum_tree_state.max_recorded_priority
         == jnp.max(new_priorities) ** priority_exponent
     )
     assert (
-        sum_tree.get(state.priority_state, batch.indices)
+        sum_tree.get(state.sum_tree_state, batch.indices)
         == new_priorities**priority_exponent
     ).all()
 
@@ -204,16 +204,16 @@ def test_prioritised_flat_buffer_does_not_smoke(
     chex.assert_tree_shape_prefix(batch, (_DEVICE_COUNT_MOCK, sample_batch_size))
 
     # Adjust priorities.
-    new_priorities = jax.pmap(jnp.ones_like)(batch.priorities) + 10007
+    new_priorities = jax.pmap(jnp.ones_like)(batch.probabilities) + 10007
     state = jax.pmap(buffer.set_priorities)(state, batch.indices, new_priorities)
 
     # Check that the priority adjustment produces the correct changes to the state.
     assert (
-        state.priority_state.max_recorded_priority
+        state.sum_tree_state.max_recorded_priority
         == jnp.max(new_priorities) ** priority_exponent
     ).all()
     assert (
-        jax.pmap(sum_tree.get)(state.priority_state, batch.indices)
+        jax.pmap(sum_tree.get)(state.sum_tree_state, batch.indices)
         == new_priorities**priority_exponent
     ).all()
 

@@ -43,7 +43,7 @@ from flashbax.utils import add_dim_to_args
 @dataclass(frozen=True)
 class PrioritisedTransitionSample(TransitionSample):
     indices: Indices
-    priorities: Probabilities
+    probabilities: Probabilities
 
 
 def validate_priority_exponent(priority_exponent: float) -> None:
@@ -134,7 +134,7 @@ def make_prioritised_flat_buffer(
         return PrioritisedTransitionSample(
             experience=ExperiencePair(first=first, second=second),
             indices=sampled_batch.indices,
-            priorities=sampled_batch.priorities,
+            probabilities=sampled_batch.probabilities,
         )
 
     return buffer.replace(add=add_fn, sample=sample_fn)  # type: ignore
