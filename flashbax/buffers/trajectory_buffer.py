@@ -89,7 +89,6 @@ def init(
     """
     # Set experience value to be empty.
     experience = jax.tree.map(jnp.empty_like, experience)
-
     # Broadcast to [add_batch_size, max_length_time_axis]
     experience = jax.tree.map(
         lambda x: jnp.broadcast_to(
@@ -98,12 +97,11 @@ def init(
         experience,
     )
 
-    state = TrajectoryBufferState(
+    return TrajectoryBufferState(
         experience=experience,
         is_full=jnp.array(False, dtype=bool),
         current_index=jnp.array(0),
     )
-    return state
 
 
 def add(
@@ -127,9 +125,8 @@ def add(
     Returns:
         A new buffer state with the batch of experience added.
     """
-    # Check that the batch has the correct shape.
+    # Check that the batch has the correct shape and dtypes.
     chex.assert_tree_shape_prefix(batch, utils.get_tree_shape_prefix(state.experience))
-    # Check that the batch has the correct dtypes.
     chex.assert_trees_all_equal_dtypes(batch, state.experience)
 
     # Get the length of the time axis of the buffer state.
@@ -138,218 +135,27 @@ def add(
     chex.assert_axis_dimension_lteq(
         jax.tree_util.tree_leaves(batch)[0], 1, max_length_time_axis
     )
-
-    # Get the length of the sequence of the batch.
+    # Determine how many timesteps are in this batch.
     seq_len = utils.get_tree_shape_prefix(batch, n_axes=2)[1]
-
-    # Calculate index location in the state where we will assign the batch of experience.
+    # Compute the time indices where the new data will be written.
     indices = (jnp.arange(seq_len) + state.current_index) % max_length_time_axis
 
     # Update the buffer state.
-    experience = jax.tree_util.tree_map(
-        lambda experience_field, batch_field: experience_field.at[:, indices].set(
-            batch_field
-        ),
+    new_experience = jax.tree.map(
+        lambda exp_field, batch_field: exp_field.at[:, indices].set(batch_field),
         state.experience,
         batch,
     )
 
-    new_index = state.current_index + seq_len
-    is_full = state.is_full | (new_index >= max_length_time_axis)
-    new_index = new_index % max_length_time_axis
+    new_current_index = state.current_index + seq_len
+    new_is_full = state.is_full | (new_current_index >= max_length_time_axis)
+    new_current_index = new_current_index % max_length_time_axis
 
-    state = state.replace(  # type: ignore
-        experience=experience,
-        current_index=new_index,
-        is_full=is_full,
+    return state.replace(  # type: ignore
+        experience=new_experience,
+        current_index=new_current_index,
+        is_full=new_is_full,
     )
-
-    return state
-
-
-def get_invalid_indices(
-    state: TrajectoryBufferState[Experience],
-    sample_sequence_length: int,
-    period: int,
-    add_batch_size: int,
-    max_length_time_axis: int,
-) -> Array:
-    """
-    Get the indices of the items that will be invalid when sampling from the buffer state. This
-    is used to mask out the invalid items when sampling. The indices are in the format of a
-    flattened array and refer to items, not the actual data. To convert item indices into data
-    indices, we would perform the following:
-
-        indices = item_indices * period
-        row_indices = indices // max_length_time_axis
-        time_indices = indices % max_length_time_axis
-
-    Item indices essentially refer to a flattened array picture of the
-    items (i.e. subsequences that can be sampled) in the buffer state.
-
-
-    Args:
-        state: The buffer state.
-        sample_sequence_length: The length of the sequence that will be sampled from the buffer
-            state.
-        period: The period refers to the interval between sampled sequences. It serves to regulate
-            how much overlap there is between the trajectories that are sampled. To understand the
-            degree of overlap, you can calculate it as the difference between the
-            sample_sequence_length and the period. For instance, if you set period=1, it means that
-            trajectories will be sampled uniformly with the potential for any degree of overlap. On
-            the other hand, if period is equal to sample_sequence_length - 1, then trajectories can
-            be sampled in a way where only the first and last timesteps overlap with each other.
-            This helps you control the extent of overlap between consecutive sequences in your
-            sampling process.
-        add_batch_size: The number of trajectories that will be added to the buffer state.
-        max_length_time_axis: The maximum length of the time axis of the buffer state.
-
-    Returns:
-        The indices of the items (with shape : [add_batch_size, num_items]) that will be invalid
-        when sampling from the buffer state.
-    """
-    # We get the max subsequence data index as done in the add function.
-    max_divisible_length = max_length_time_axis - (max_length_time_axis % period)
-    max_subsequence_data_index = max_divisible_length - 1
-    # We get the data index that is at least sample_sequence_length away from the
-    # current index.
-    previous_valid_data_index = (
-        state.current_index - sample_sequence_length
-    ) % max_length_time_axis
-    # We ensure that this index is not above the maximum mappable data index of the buffer.
-    previous_valid_data_index = jnp.minimum(
-        previous_valid_data_index, max_subsequence_data_index
-    )
-    # We then convert the data index into the item index and add one to get the index
-    # of the item that is broken apart.
-    invalid_item_starting_index = (previous_valid_data_index // period) + 1
-    # We then take the modulo of the invalid item index to ensure that it is within the
-    # bounds of the priority array. max_length_time_axis // period is the maximum number
-    # of items/subsequences that can be sampled from the buffer state.
-    invalid_item_starting_index = invalid_item_starting_index % (
-        max_length_time_axis // period
-    )
-
-    # Calculate the maximum number of items/subsequences that can start within a
-    # sample length of data. We add one to account for situations where the max
-    # number of items has been broken. Often, this will unfortunately mask an item
-    # that is valid however this should not be a severe issue as it would be only
-    # one additional item.
-    max_num_invalid_items = (sample_sequence_length // period) + 1
-    # Get the actual indices of the items we cannot sample from.
-    invalid_item_indices = (
-        jnp.arange(max_num_invalid_items) + invalid_item_starting_index
-    ) % (max_length_time_axis // period)
-    # Since items that are broken are broken in the same place in each row, we
-    # broadcast and add the total number of items to each index to reference
-    # the invalid items in each add_batch row.
-    invalid_item_indices = invalid_item_indices + jnp.arange(add_batch_size)[
-        :, None
-    ] * (max_length_time_axis // period)
-
-    return invalid_item_indices
-
-
-def calculate_uniform_item_indices(
-    state: TrajectoryBufferState[Experience],
-    rng_key: chex.PRNGKey,
-    batch_size: int,
-    sample_sequence_length: int,
-    period: int,
-    add_batch_size: int,
-    max_length_time_axis: int,
-) -> Array:
-    """Randomly sample a batch of item indices from the buffer state. This is done uniformly.
-
-    Args:
-        state: The buffer's state.
-        rng_key: Random key.
-        batch_size: Batch size of sampled experience.
-        sample_sequence_length: Length of trajectory to sample.
-        period: The period refers to the interval between sampled sequences. It serves to regulate
-            how much overlap there is between the trajectories that are sampled. To understand the
-            degree of overlap, you can calculate it as the difference between the
-            sample_sequence_length and the period. For instance, if you set period=1, it means that
-            trajectories will be sampled uniformly with the potential for any degree of overlap. On
-            the other hand, if period is equal to sample_sequence_length - 1, then trajectories can
-            be sampled in a way where only the first and last timesteps overlap with each other.
-            This helps you control the extent of overlap between consecutive sequences in your
-            sampling process.
-        add_batch_size: The number of trajectories that will be added to the buffer state.
-        max_length_time_axis: The maximum length of the time axis of the buffer state.
-
-    Returns:
-        The indices of the items that will be sampled from the buffer state.
-
-    """
-    # Get the max subsequence data index to ensure we dont sample items
-    # that should not ever be sampled i.e. a subsequence beyond the period
-    # boundary.
-    max_divisible_length = max_length_time_axis - (max_length_time_axis % period)
-    max_subsequence_data_index = max_divisible_length - 1
-    # Get the maximum valid time index of the data buffer based on
-    # whether it is full or not.
-    max_data_time_index = jnp.where(
-        state.is_full,
-        max_subsequence_data_index,
-        state.current_index - sample_sequence_length,
-    )
-    # Convert the max time index to the maximum non-valid item index. This is the item
-    # index that we can sample up to (excluding). We add 1 since the max time index is the last
-    # valid time index that we can sample from and we want the exclusive upper bound
-    # or in the case of a full buffer, the size of one row of the item array.
-    max_item_time_index = (max_data_time_index // period) + 1
-
-    # Get the indices of the items that will be invalid when sampling.
-    invalid_item_indices = get_invalid_indices(
-        state=state,
-        sample_sequence_length=sample_sequence_length,
-        period=period,
-        add_batch_size=add_batch_size,
-        max_length_time_axis=max_length_time_axis,
-    )
-    # Since all the invalid indices are repeated albeit with a batch offset,
-    # we can just take the first row of the invalid indices for calculation.
-    invalid_item_indices = invalid_item_indices[0]
-
-    # We then get the upper bound of the item indices that we can sample from.
-    # When being initially populated with data, the max time index will already account
-    # for the items that cannot be sampled meaning that invalid indices are not needed.
-    # Additionally, there is separate logic that needs to be performed when the buffer is not full.
-    # When the buffer is full, the max time index will not account for the items that cannot be
-    # sampled meaning that we need to subtract the number of invalid items from the
-    # max item index.
-    num_invalid_items = jnp.where(state.is_full, invalid_item_indices.shape[0], 0)
-    upper_bound = max_item_time_index - num_invalid_items
-
-    # Since the invalid item indices are always consecutive (in a circular manner),
-    # we can get the offset by taking the last item index and adding one.
-    time_offset = invalid_item_indices[-1] + 1
-
-    # We then sample a batch of item indices over the time axis.
-    sampled_item_time_indices = jax.random.randint(
-        rng_key, (batch_size,), 0, upper_bound
-    )
-    # We then add the offset and modulo the indices to ensure that they are within
-    # the bounds of the item array (which doesnt actually exist). We modulo by the
-    # max item index to ensure that we loop back to the start of the item array.
-    sampled_item_time_indices = (
-        sampled_item_time_indices + time_offset
-    ) % max_item_time_index
-
-    # We then get the batch indices by sampling a batch of indices over the batch axis.
-    sampled_item_batch_indices = jax.random.randint(
-        rng_key, (batch_size,), 0, add_batch_size
-    )
-
-    # We then calculate the item indices by multiplying the batch indices by the
-    # number of items in each batch and adding the time indices. This gives us
-    # a flattened array picture of the items we will sample from.
-    item_indices = (
-        sampled_item_batch_indices * (max_length_time_axis // period)
-    ) + sampled_item_time_indices
-
-    return item_indices
 
 
 def sample(
@@ -380,36 +186,49 @@ def sample(
     Returns:
         A batch of experience.
     """
+
+    # Get add_batch_size and the full size of the time axis.
     add_batch_size, max_length_time_axis = utils.get_tree_shape_prefix(
         state.experience, n_axes=2
     )
-    # Calculate the indices of the items that will be sampled.
-    item_indices = calculate_uniform_item_indices(
-        state,
-        rng_key,
-        batch_size,
-        sequence_length,
-        period,
-        add_batch_size,
-        max_length_time_axis,
+
+    # When full, the max time index is max_length_time_axis otherwise it is current index.
+    max_time = jnp.where(state.is_full, max_length_time_axis, state.current_index)
+    # When full, the oldest valid data is current_index otherwise it is zero.
+    head = jnp.where(state.is_full, state.current_index, 0)
+
+    # Given no wrap around, the last valid starting index is:
+    max_start = max_time - sequence_length
+    # If max_start is negative then we cannot sample yet.
+    # Otherwise the number of valid items in the buffer are (max_start // period) + 1.
+    num_valid_items = jnp.where(max_start >= 0, (max_start // period) + 1, 0)
+    # (num_valid_items is the number of candidate subsequences—each starting at a
+    # multiple of period that lie entirely in the valid region.)
+
+    # Split the RNG key for sampling items and batch indices.
+    rng_key, subkey_items = jax.random.split(rng_key)
+    rng_key, subkey_batch = jax.random.split(rng_key)
+
+    # Sample an item index in [0, num_valid_items). (This is the index in the candidate list.)
+    sampled_item_idx = jax.random.randint(
+        subkey_items, (batch_size,), 0, num_valid_items
     )
+    # Compute the logical start time index: ls = (sampled_item_idx * period).
+    logical_start = sampled_item_idx * period
+    # Map logical time to physical index in the buffer given there is wrap around.
+    physical_start = (head + logical_start) % max_length_time_axis
 
-    # Convert the item indices to the indices of the data buffer
-    flat_data_indices = item_indices * period
-    # Get the batch index and time index of the sampled items.
-    batch_data_indices = flat_data_indices // max_length_time_axis
-    time_data_indices = flat_data_indices % max_length_time_axis
-
-    # The buffer is circular, so we can loop back to the start (`% max_length_time_axis`)
-    # if the time index is greater than the length. We then add the sequence length to get
-    # the end index of the sequence.
-    time_data_indices = (
-        jnp.arange(sequence_length) + time_data_indices[:, jnp.newaxis]
+    # Also sample which add_batch row to use.
+    sampled_batch_indices = jax.random.randint(
+        subkey_batch, (batch_size,), 0, add_batch_size
+    )
+    # Create indices for the full subsequence.
+    traj_time_indices = (
+        physical_start[:, None] + jnp.arange(sequence_length)
     ) % max_length_time_axis
 
-    # Slice the experience in the buffer to get a batch of trajectories of length sequence_length
-    batch_trajectory = jax.tree_util.tree_map(
-        lambda x: x[batch_data_indices[:, jnp.newaxis], time_data_indices],
+    batch_trajectory = jax.tree.map(
+        lambda x: x[sampled_batch_indices[:, None], traj_time_indices],
         state.experience,
     )
 
