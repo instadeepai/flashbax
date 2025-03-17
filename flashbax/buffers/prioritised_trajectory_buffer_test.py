@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from copy import deepcopy
-from typing import List
 
 import chex
 import jax
@@ -206,8 +205,8 @@ def test_prioritised_sample(
     with pytest.raises(AssertionError):
         chex.assert_trees_all_close(batch1, batch2)
 
-    assert (batch1.priorities > 0).all()
-    assert (batch2.priorities > 0).all()
+    assert (batch1.probabilities > 0).all()
+    assert (batch2.probabilities > 0).all()
 
     # Check correct the shape prefix is correct.
     chex.assert_trees_all_equal_dtypes(
@@ -317,18 +316,18 @@ def test_adjust_priorities(
     )
 
     # Create fake new priorities, and apply the adjustment.
-    new_priorities = jnp.ones_like(batch.priorities) + 10007
+    new_priorities = jnp.ones_like(batch.probabilities) + 10007
     state = prioritised_trajectory_buffer.set_priorities(
         state, batch.indices, new_priorities, priority_exponent, device
     )
 
     # Check that this results in the correct changes to the state.
     assert (
-        state.priority_state.max_recorded_priority
+        state.sum_tree_state.max_recorded_priority
         == jnp.max(new_priorities) ** priority_exponent
     )
     assert (
-        sum_tree.get(state.priority_state, batch.indices)
+        sum_tree.get(state.sum_tree_state, batch.indices)
         == new_priorities**priority_exponent
     ).all()
 
@@ -377,351 +376,215 @@ def test_prioritised_trajectory_buffer_does_not_smoke(
         (_DEVICE_COUNT_MOCK, sample_batch_size, sample_sequence_length),
     )
     chex.assert_tree_shape_prefix(
-        batch.priorities, (_DEVICE_COUNT_MOCK, sample_batch_size)
+        batch.probabilities, (_DEVICE_COUNT_MOCK, sample_batch_size)
     )
 
     state = jax.pmap(buffer.set_priorities)(
-        state, batch.indices, jnp.ones_like(batch.priorities)
+        state, batch.indices, jnp.ones_like(batch.probabilities)
     )
 
 
-def check_index_calc(
-    fake_transition: chex.ArrayTree,
+def is_strictly_increasing(arr: jnp.ndarray) -> jnp.ndarray:
+    """
+    Returns a (True/False) indicating whether `arr`
+    is strictly increasing (arr[i] > arr[i-1] for all i).
+    """
+    # If arr has 0 or 1 elements, it's trivially increasing.
+    if arr.shape[0] <= 1:
+        return jnp.bool_(True)
+    # Otherwise, check that every adjacent difference is positive.
+    return jnp.all(arr[1:] > arr[:-1])
+
+
+@pytest.mark.parametrize("add_length", [4, 9, 13])
+@pytest.mark.parametrize("add_batch_size", [2, 3])
+@pytest.mark.parametrize("sample_sequence_length", [3, 4, 9, 13])
+@pytest.mark.parametrize("period", [1, 2, 3, 4, 5])
+@pytest.mark.parametrize("max_length_time_axis", [13, 16, 26, 39])
+def test_prioritised_sample_doesnt_sample_prev_broken_trajectories(
+    add_length: int,
     add_batch_size: int,
-    sample_batch_size: int,
-    max_length: int,
-    add_sequence_length: int,
     sample_sequence_length: int,
-    sample_period: int,
-    add_iter: int,
-    expected_priority_indices: List[int],
-    expected_priority_values: List[float],
-):
-    """Helper function to check the indices and values returned by the
-    calculate_item_indices_and_values function."""
+    period: int,
+    max_length_time_axis: int,
+) -> None:
+    """Test to ensure that `sample` avoids including rewards from broken
+    trajectories.
+    """
+    # Because we are sweeping over a range of values
+    # it is easier to check here if we shouldnt test
+    remainder = max_length_time_axis % period
+    real_length = max_length_time_axis - remainder
+    if real_length <= add_length or real_length <= sample_sequence_length:
+        # Due to the new constraints placed on the PER buffer length
+        # if this situation arises we simply skip
+        return
+
+    fake_transition = {"reward": jnp.array([1])}
+
+    offset = jnp.arange(add_batch_size).reshape(add_batch_size, 1, 1) * 1000
+
     buffer = prioritised_trajectory_buffer.make_prioritised_trajectory_buffer(
-        max_length_time_axis=max_length,
-        min_length_time_axis=sample_sequence_length,
-        sample_batch_size=sample_batch_size,
         add_batch_size=add_batch_size,
+        sample_batch_size=2048,
         sample_sequence_length=sample_sequence_length,
-        period=sample_period,
+        period=period,
+        max_length_time_axis=max_length_time_axis,
+        min_length_time_axis=sample_sequence_length,
     )
+    buffer_init = jax.jit(buffer.init)
+    buffer_add = jax.jit(buffer.add)
+    buffer_sample = jax.jit(buffer.sample)
 
-    state = buffer.init(fake_transition)
+    rng_key = jax.random.PRNGKey(0)
+    state = buffer_init(fake_transition)
 
-    fake_batch_sequence = get_fake_batch_sequence(
-        fake_transition, add_batch_size, add_sequence_length
-    )
+    for i in range(12):
+        fake_batch_sequence = {
+            "reward": jnp.arange(add_length)
+            .reshape(1, add_length, 1)
+            .repeat(add_batch_size, axis=0)
+            + offset
+            + add_length * i
+        }
+        state = buffer_add(state, fake_batch_sequence)
 
-    # We add to the buffer before calling function for testing purposes because
-    # the calculate item indices and values function would be called before the
-    # data is officially inserted into the buffer. Thats why on add_iter = 0,
-    # we are technically referring to the items created after adding 1 sequence
-    # to the buffer but for testing the indices we must not actually add the data.
-    for _ in range(add_iter):
-        state = buffer.add(state, fake_batch_sequence)
+        # If the root node of the sum tree is zero
+        # this means there are no valid items available
+        # then test will definitely fail so we skip this
+        # This is under the assumption that the sum tree
+        # is correctly implemented which we have tests for.
+        if state.sum_tree_state.nodes[0] == 0:
+            continue
 
-    (
-        priority_indices,
-        priority_values,
-    ) = prioritised_trajectory_buffer.calculate_item_indices_and_priorities(
-        state,
-        sample_sequence_length,
-        sample_period,
-        add_sequence_length,
-        add_batch_size,
-        max_length,
-    )
-    assert jnp.all(priority_indices == jnp.array(expected_priority_indices))
-    assert jnp.all(priority_values == jnp.array(expected_priority_values))
+        rng_key, rng_key1 = jax.random.split(rng_key)
+
+        if buffer.can_sample(state):
+            sample = buffer_sample(state, rng_key1)
+
+            sampled_r = sample.experience["reward"]
+
+            for b in range(sampled_r.shape[0]):
+                assert is_strictly_increasing(sampled_r[b])
 
 
-@pytest.mark.parametrize(
-    "add_batch_size, max_length, add_sequence_length, sample_sequence_length, sample_period",
-    [(1, 13, 7, 5, 3)],
-)
-@pytest.mark.parametrize(
-    "add_iter, expected_priority_indices, expected_priority_values",
-    [
-        (0, [0, 1, 2], [1.0, 0.0, 0.0]),
-        (1, [1, 2, 3], [1.0, 1.0, 1.0]),
-        (2, [0, 1, 2], [1.0, 1.0, 0.0]),
-        (3, [2, 3, 0], [1.0, 1.0, 0.0]),
-        (4, [0, 1, 2], [1.0, 1.0, 0.0]),
-        (5, [2, 3, 0], [1.0, 1.0, 0.0]),
-        (6, [0, 1, 2], [1.0, 1.0, 0.0]),
-        (7, [2, 3, 0], [1.0, 1.0, 0.0]),
-        (8, [0, 1, 2], [1.0, 1.0, 1.0]),
-        (9, [3, 0, 1], [1.0, 1.0, 0.0]),
-        (10, [1, 2, 3], [1.0, 1.0, 0.0]),
-        (11, [3, 0, 1], [1.0, 1.0, 0.0]),
-        (12, [1, 2, 3], [1.0, 1.0, 0.0]),
-    ],
-)
-def test_item_and_priority_calculation_case1(
-    fake_transition: chex.ArrayTree,
-    rng_key: chex.PRNGKey,
+# HUMAN TEST CASES
+#####################
+def _human_test_cases_for_valid_and_invalid_indices(
+    add_length: int,
     add_batch_size: int,
-    sample_batch_size: int,
-    max_length: int,
-    add_sequence_length: int,
     sample_sequence_length: int,
-    sample_period: int,
-    add_iter: int,
-    expected_priority_indices: List[int],
-    expected_priority_values: List[float],
-):
-    """
-    Case 1: max_length = 13, add_sequence_length = 7, sample_sequence_length = 5, sample_period = 3
-
-    Check max_length not divisible by sample_period & add_sequence_length not divisible by
-    sample_period & max_length not divisible by add_sequence_length.
+    period: int,
+    max_length_time_axis: int,
+    correct_valid_item_indices: dict,
+    correct_invalid_item_indices: dict,
+) -> None:
+    """Test to ensure that `sample` avoids including rewards from broken
+    trajectories.
     """
 
-    check_index_calc(
-        fake_transition,
-        add_batch_size,
-        sample_batch_size,
-        max_length,
-        add_sequence_length,
-        sample_sequence_length,
-        sample_period,
-        add_iter,
-        expected_priority_indices,
-        expected_priority_values,
+    fake_transition = {"reward": jnp.array([1])}
+
+    offset = jnp.arange(add_batch_size).reshape(add_batch_size, 1, 1) * 1000
+
+    buffer = prioritised_trajectory_buffer.make_prioritised_trajectory_buffer(
+        add_batch_size=add_batch_size,
+        sample_batch_size=2048,
+        sample_sequence_length=sample_sequence_length,
+        period=period,
+        max_length_time_axis=max_length_time_axis,
+        min_length_time_axis=sample_sequence_length,
+    )
+    buffer_init = jax.jit(buffer.init)
+    buffer_add = jax.jit(buffer.add)
+
+    state = buffer_init(fake_transition)
+
+    for i in range(5):
+        fake_batch_sequence = {
+            "reward": jnp.arange(add_length)
+            .reshape(1, add_length, 1)
+            .repeat(add_batch_size, axis=0)
+            + offset
+            + add_length * i
+        }
+
+        (
+            valid_items,
+            invalid_items,
+        ) = prioritised_trajectory_buffer._calculate_new_item_indices(
+            state.running_index,
+            add_length,
+            period,
+            max_length_time_axis,
+            sample_sequence_length,
+            add_batch_size,
+        )
+        for j, idx in enumerate(correct_valid_item_indices[i]):
+            assert idx == valid_items[j], "Incorrectly calculated valid item"
+
+        for j, idx in enumerate(correct_invalid_item_indices[i]):
+            assert (
+                idx == invalid_items[j]
+            ), f"Incorrectly calculated invalid item, {idx} vs {invalid_items[j]}"
+
+        assert jnp.all(state.sum_tree_state.nodes >= 0)
+
+        state = buffer_add(state, fake_batch_sequence)
+
+
+def test_human_case_1():
+    # TEST CASE 1
+    test_case_1_valid = {
+        0: [0],
+        1: [5, 6],
+        2: [4, 5],
+        3: [2, 3],
+        4: [1, 2],
+    }
+    test_case_1_invalid = {
+        0: [],
+        1: [0],
+        2: [5, 6],
+        3: [4, 5],
+        4: [2, 3],
+    }
+
+    _human_test_cases_for_valid_and_invalid_indices(
+        13, 1, 13, 2, 16, test_case_1_valid, test_case_1_invalid
     )
 
 
-@pytest.mark.parametrize(
-    "add_batch_size, max_length, add_sequence_length, sample_sequence_length, sample_period",
-    [(1, 8, 3, 5, 2)],
-)
-@pytest.mark.parametrize(
-    "add_iter, expected_priority_indices, expected_priority_values",
-    [
-        (0, [0, 1], [0.0, 0.0]),
-        (1, [0, 1], [1.0, 0.0]),
-        (
-            2,
-            [1, 2],
-            [
-                1.0,
-                1.0,
-            ],
-        ),
-        (
-            3,
-            [3, 0],
-            [
-                1.0,
-                0.0,
-            ],
-        ),
-        (
-            4,
-            [0, 1],
-            [
-                1.0,
-                1.0,
-            ],
-        ),
-        (
-            5,
-            [2, 3],
-            [
-                1.0,
-                0.0,
-            ],
-        ),
-        (
-            6,
-            [3, 0],
-            [
-                1.0,
-                1.0,
-            ],
-        ),
-        (
-            7,
-            [1, 2],
-            [
-                1.0,
-                0.0,
-            ],
-        ),
-    ],
-)
-def test_item_and_priority_calculation_case2(
-    fake_transition: chex.ArrayTree,
-    rng_key: chex.PRNGKey,
-    add_batch_size: int,
-    sample_batch_size: int,
-    max_length: int,
-    add_sequence_length: int,
-    sample_sequence_length: int,
-    sample_period: int,
-    add_iter: int,
-    expected_priority_indices: List[int],
-    expected_priority_values: List[float],
-):
-    """
-    Case 2: max_length = 8, add_sequence_length = 3, sample_sequence_length = 5, sample_period = 2
+def test_human_case_2():
+    # TEST CASE 2
+    test_case_2_valid = {
+        0: [],
+        1: [0, 1],
+        2: [2],
+        3: [3, 4],
+        4: [5],
+    }
+    test_case_2_invalid = {
+        0: [],
+        1: [],
+        2: [],
+        3: [],
+        4: [0, 1],
+    }
 
-    Check max length divisible by sample period & add sequence length not divisible by sample
-    period & sample sequence length greater than add sequence length
-    """
-    check_index_calc(
-        fake_transition,
-        add_batch_size,
-        sample_batch_size,
-        max_length,
-        add_sequence_length,
-        sample_sequence_length,
-        sample_period,
-        add_iter,
-        expected_priority_indices,
-        expected_priority_values,
+    _human_test_cases_for_valid_and_invalid_indices(
+        3, 1, 4, 2, 12, test_case_2_valid, test_case_2_invalid
     )
 
 
-@pytest.mark.parametrize(
-    "add_batch_size, max_length, add_sequence_length, sample_sequence_length, sample_period",
-    [(1, 8, 3, 3, 4)],
-)
-@pytest.mark.parametrize(
-    "add_iter, expected_priority_indices, expected_priority_values",
-    [
-        (0, [0], [1.0]),
-        (1, [1], [0.0]),
-        (2, [1], [1.0]),
-        (3, [0], [1.0]),
-        (4, [1], [1.0]),
-        (5, [0], [0.0]),
-        (6, [0], [1.0]),
-        (7, [1], [1.0]),
-    ],
-)
-def test_item_and_priority_calculation_case3(
-    fake_transition: chex.ArrayTree,
-    rng_key: chex.PRNGKey,
-    add_batch_size: int,
-    sample_batch_size: int,
-    max_length: int,
-    add_sequence_length: int,
-    sample_sequence_length: int,
-    sample_period: int,
-    add_iter: int,
-    expected_priority_indices: List[int],
-    expected_priority_values: List[float],
-):
-    """Case 3: max_length = 8, add_sequence_length = 3, sample_sequence_length = 3,
-    sample_period = 4
+def test_human_case_3():
+    # TEST CASE 3
+    test_case_3_valid = {0: [], 1: [0], 2: [1, 2], 3: [3], 4: [0, 1]}
+    test_case_3_invalid = {0: [], 1: [], 2: [0], 3: [1], 4: [2, 3]}
 
-    Check period greater than add sequence length and sample sequence length but Max
-    length divisible by sample period.
-    """
-    check_index_calc(
-        fake_transition,
-        add_batch_size,
-        sample_batch_size,
-        max_length,
-        add_sequence_length,
-        sample_sequence_length,
-        sample_period,
-        add_iter,
-        expected_priority_indices,
-        expected_priority_values,
+    _human_test_cases_for_valid_and_invalid_indices(
+        3, 1, 5, 2, 8, test_case_3_valid, test_case_3_invalid
     )
 
 
-@pytest.mark.parametrize(
-    "add_batch_size, max_length, add_sequence_length, sample_sequence_length, sample_period",
-    [(2, 8, 3, 3, 4)],
-)
-@pytest.mark.parametrize(
-    "add_iter, expected_priority_indices, expected_priority_values",
-    [
-        (0, [0, 2], [1.0, 1.0]),
-        (1, [1, 3], [0.0, 0.0]),
-        (2, [1, 3], [1.0, 1.0]),
-        (3, [0, 2], [1.0, 1.0]),
-        (4, [1, 3], [1.0, 1.0]),
-        (5, [0, 2], [0.0, 0.0]),
-        (6, [0, 2], [1.0, 1.0]),
-        (7, [1, 3], [1.0, 1.0]),
-    ],
-)
-def test_item_and_priority_calculation_case4(
-    fake_transition: chex.ArrayTree,
-    rng_key: chex.PRNGKey,
-    add_batch_size: int,
-    sample_batch_size: int,
-    max_length: int,
-    add_sequence_length: int,
-    sample_sequence_length: int,
-    sample_period: int,
-    add_iter: int,
-    expected_priority_indices: List[int],
-    expected_priority_values: List[float],
-):
-    """Case 4: add_batch_size = 2 max_length = 8, add_sequence_length = 3,
-    sample_sequence_length = 3, sample_period = 4
-
-    Check simple case when using multiple rows in the buffer.
-    """
-    check_index_calc(
-        fake_transition,
-        add_batch_size,
-        sample_batch_size,
-        max_length,
-        add_sequence_length,
-        sample_sequence_length,
-        sample_period,
-        add_iter,
-        expected_priority_indices,
-        expected_priority_values,
-    )
-
-
-@pytest.mark.parametrize(
-    "add_batch_size, max_length, add_sequence_length, sample_sequence_length, sample_period",
-    [(1, 15, 5, 5, 1)],
-)
-@pytest.mark.parametrize(
-    "add_iter, expected_priority_indices, expected_priority_values",
-    [
-        (0, [0, 1, 2, 3, 4, 5], [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
-        (1, [1, 2, 3, 4, 5, 6], [1.0, 1.0, 1.0, 1.0, 1.0, 0.0]),
-        (2, [6, 7, 8, 9, 10, 11], [1.0, 1.0, 1.0, 1.0, 1.0, 0.0]),
-        (3, [11, 12, 13, 14, 0, 1], [1.0, 1.0, 1.0, 1.0, 1.0, 0.0]),
-    ],
-)
-def test_item_and_priority_calculation_case5(
-    fake_transition: chex.ArrayTree,
-    rng_key: chex.PRNGKey,
-    add_batch_size: int,
-    sample_batch_size: int,
-    max_length: int,
-    add_sequence_length: int,
-    sample_sequence_length: int,
-    sample_period: int,
-    add_iter: int,
-    expected_priority_indices: List[int],
-    expected_priority_values: List[float],
-):
-    """Case 5: add_batch_size = 1 max_length = 15, add_sequence_length = 5,
-    sample_sequence_length = 5, sample_period = 1
-    """
-    check_index_calc(
-        fake_transition,
-        add_batch_size,
-        sample_batch_size,
-        max_length,
-        add_sequence_length,
-        sample_sequence_length,
-        sample_period,
-        add_iter,
-        expected_priority_indices,
-        expected_priority_values,
-    )
+#####################

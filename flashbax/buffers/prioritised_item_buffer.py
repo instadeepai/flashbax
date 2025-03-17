@@ -104,12 +104,12 @@ def create_prioritised_item_buffer(
     ) -> PrioritisedTrajectoryBufferSample[Experience]:
         """Samples a batch of items from the buffer."""
         sampled_batch = buffer.sample(state, rng_key)
-        priorities = sampled_batch.priorities
+        probabilities = sampled_batch.probabilities
         indices = sampled_batch.indices
         sampled_batch = sampled_batch.experience
         sampled_batch = jax.tree.map(lambda x: x.squeeze(axis=1), sampled_batch)
         return PrioritisedTrajectoryBufferSample(
-            experience=sampled_batch, indices=indices, priorities=priorities
+            experience=sampled_batch, indices=indices, probabilities=probabilities
         )
 
     return buffer.replace(add=add_fn, sample=sample_fn)  # type: ignore

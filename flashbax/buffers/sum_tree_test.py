@@ -23,20 +23,14 @@ import pytest
 from flashbax.buffers import sum_tree
 
 
-@pytest.fixture
-def capacity() -> int:
-    return 256
-
-
-@pytest.fixture
-def state(capacity: int) -> sum_tree.SumTreeState:
-    """Initial state of the sum-tree."""
-    return sum_tree.init(capacity=capacity)
-
-
-def test_set_non_batched(state: sum_tree.SumTreeState) -> None:
+@pytest.mark.parametrize("capacity", [7, 32, 50, 100, 256, 1024])
+def test_set_non_batched(
+    capacity: int,
+) -> None:
     """Test that `set_non_batched` results in the expected updates to the
     sum-tree state."""
+
+    state = sum_tree.init(capacity=capacity)
 
     # Set a node index to a value.
     node_index1 = jnp.int32(2)
@@ -71,12 +65,18 @@ def test_set_non_batched(state: sum_tree.SumTreeState) -> None:
     assert state.nodes[0] == value1 + value3
     assert state.max_recorded_priority == jnp.maximum(value1, value3)
 
+    assert jnp.all(state.nodes >= 0)
 
+
+@pytest.mark.parametrize("capacity", [32, 50, 100, 256, 1024])
 def test_set_batch_matches_set_non_batched(
-    state: sum_tree.SumTreeState,
+    capacity: int,
 ) -> None:
     """Check that setting a batch of values results in the same behavior
     as setting value sequentially using `set_non_batched`."""
+
+    state = sum_tree.init(capacity=capacity)
+
     init_state = deepcopy(state)  # Save for reuse.
     indexes = jnp.arange(10) + 15
     rng_key = jax.random.PRNGKey(0)
@@ -120,10 +120,19 @@ def test_set_batch_matches_set_non_batched(
         state_scan, state_bincount, state_from_sequential_setting
     )
 
+    assert jnp.all(state_scan.nodes >= 0)
+    assert jnp.all(state_bincount.nodes >= 0)
 
-def test_set_batch_clashing_values(state: sum_tree.SumTreeState) -> None:
+
+@pytest.mark.parametrize("capacity", [11, 32, 50, 100, 256, 1024])
+def test_set_batch_clashing_values(
+    capacity: int,
+) -> None:
     """Check that if there is a repeated index that this results in the latest value out of the
     values corresponding to the repeated value being set."""
+
+    state = sum_tree.init(capacity=capacity)
+
     num_indices = 10
     # Create set of repeated indices. Each index will be repeated once.
     repeated_indices = jnp.concatenate(
@@ -157,14 +166,19 @@ def test_set_batch_clashing_values(state: sum_tree.SumTreeState) -> None:
         state_bincount,
     )
 
+    assert jnp.all(state_scan.nodes >= 0)
+    assert jnp.all(state_bincount.nodes >= 0)
 
+
+@pytest.mark.parametrize("capacity", [33, 50, 100, 256, 1024])
 def test_sample(
-    state: sum_tree.SumTreeState,
+    capacity: int,
     rng_key: chex.PRNGKey,
     batch_size: int = 32,
 ) -> None:
     """Check sampling works by sampling and checking that the result matches the indexes in
     the sumtree, and that it is random."""
+    state = sum_tree.init(capacity=capacity)
 
     total_size = state.nodes.shape[0]
     bottom_depth = state.tree_depth
@@ -188,13 +202,17 @@ def test_sample(
     index_alt = sum_tree.sample(state, rng_key2)
     assert index_alt != index
 
+    assert jnp.all(sum_tree.get(state, index) > 0)
+    assert jnp.all(sum_tree.get(state, index_alt) > 0)
 
+
+@pytest.mark.parametrize("capacity", [33, 50, 100, 256, 1024])
 def test_stratified_sample(
-    state: sum_tree.SumTreeState, rng_key: chex.PRNGKey, batch_size: int = 32
+    capacity: int, rng_key: chex.PRNGKey, batch_size: int = 32
 ) -> None:
     """Check stratified sampling works by sampling and checking that the result matches the
     indexes in the sumtree, and that it is random."""
-
+    state = sum_tree.init(capacity=capacity)
     # Fill state enough that we can sample.
     indexes = jnp.arange(batch_size + 15, dtype=int)
     values = indexes + 10.0
@@ -213,12 +231,18 @@ def test_stratified_sample(
     with pytest.raises(AssertionError):
         chex.assert_trees_all_close(sampled_indices, sampled_indices_alt)
 
+    assert jnp.all(sum_tree.get(state, sampled_indices) > 0)
+    assert jnp.all(sum_tree.get(state, sampled_indices_alt) > 0)
 
+
+@pytest.mark.parametrize("capacity", [110, 256, 1024])
 def test_set_batch_scan_matches_set_batch_bincount(
-    state: sum_tree.SumTreeState,
+    capacity: int,
 ) -> None:
     """Check that setting a batch of values results in the same behavior
     as setting value sequentially using `set_non_batched`."""
+    state = sum_tree.init(capacity=capacity)
+
     init_state = deepcopy(state)  # Save for reuse.
     indexes = jnp.arange(100)
     rng_key1 = jax.random.PRNGKey(0)
@@ -268,7 +292,11 @@ def test_set_batch_scan_matches_set_batch_bincount(
 
     chex.assert_trees_all_close(state_scan, state_bincount)
 
+    assert jnp.all(state_scan.nodes >= 0)
+    assert jnp.all(state_bincount.nodes >= 0)
 
+
+@pytest.mark.parametrize("capacity", [100])
 def test_is_jittable(
     capacity: int, rng_key: chex.PRNGKey, sampling_batch_size: int = 8
 ) -> None:
