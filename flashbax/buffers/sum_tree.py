@@ -12,19 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-"""
- Pure functions defining a sum-tree data structure. The desired use is within a prioritised replay
- buffer, see Prioritized Experience Replay by Schaul et al. (2015) and `prioritised_replay.py`.
-
- This is an adaption of the sum-tree implementation from
- dopamine: https://github.com/google/dopamine/blob/master/dopamine/replay_memory/sum_tree.py.
- Lots of the code is verbatim copied.
- The key differences between this implementation and the dopamine implementation are (1) This
- implementation is in jax with a functional style, and (2) this implementation focuses on
- vectorised adding (rather sequential adding).
-"""
-
 from typing import TYPE_CHECKING, Optional, Tuple, Union
 
 if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
@@ -46,6 +33,7 @@ class SumTreeState:
     max_recorded_priority: Array
     tree_depth: int = struct.field(pytree_node=False)
     capacity: int = struct.field(pytree_node=False)
+    dtype: jnp.dtype = struct.field(pytree_node=False)
 
 
 def get_tree_depth(capacity: int) -> int:
@@ -61,22 +49,34 @@ def get_tree_depth(capacity: int) -> int:
     return int(np.ceil(np.log2(capacity)))
 
 
-def init(capacity: int) -> SumTreeState:
+def init(capacity: int, dtype: Optional[jnp.dtype] = None) -> SumTreeState:
     """Creates the sum tree data structure for the given replay capacity.
 
     Args:
         capacity: The maximum number of elements that can be stored in this
             data structure.
+        dtype: The data type of the sum tree. If None, will use jnp.float64 if
+            jax.config.x64_enabled is True, otherwise will use jnp.float32.
+            It is strongly recommended to use jnp.float64 for performance reasons.
+            If not, there is a risk of numerical instability causing the sum tree to
+            sample priority zero transitions.
     """
+    if dtype is None:
+        if jax.config.x64_enabled:  # type: ignore
+            dtype = jnp.float64
+        else:
+            dtype = jnp.float32
+
     tree_depth = get_tree_depth(capacity)
     array_size = 2 ** (tree_depth + 1) - 1
-    nodes = jnp.zeros(array_size)
-    max_recorded_priority = jnp.array(1.0)
+    nodes = jnp.zeros(array_size, dtype=dtype)
+    max_recorded_priority = jnp.array(1.0, dtype=dtype)
     return SumTreeState(
         nodes=nodes,
         max_recorded_priority=max_recorded_priority,
         tree_depth=tree_depth,
         capacity=capacity,
+        dtype=dtype,
     )
 
 
@@ -137,7 +137,7 @@ def sample(
             raise ValueError(
                 "Either the `rng_key` or the `query_value` must be specified."
             )
-        query_value = jax.random.uniform(rng_key)
+        query_value = jax.random.uniform(rng_key, dtype=state.dtype)
     query_value = query_value * _total_priority(state)
 
     # Now traverse the sum tree.
@@ -198,13 +198,13 @@ def stratified_sample(
         Batch of indices sampled from the sum tree.
     """
     query_keys = jax.random.split(rng_key, batch_size)
-    bounds = jnp.linspace(0.0, 1.0, batch_size + 1)
+    bounds = jnp.linspace(0.0, 1.0, batch_size + 1, dtype=state.dtype)
 
     lower_bounds = bounds[:-1, None]
     upper_bounds = bounds[1:, None]
 
     query_values = jax.vmap(jax.random.uniform, in_axes=(0, None, None, 0, 0))(
-        query_keys, (), jnp.float32, lower_bounds, upper_bounds
+        query_keys, (), state.dtype, lower_bounds, upper_bounds
     )
 
     return jax.vmap(sample, in_axes=(None, None, 0))(
@@ -272,6 +272,8 @@ def set_non_batched(
             nonnegative. Setting value = 0 will cause the element to never be sampled.
 
     """
+    # Cast the value to the correct dtype.
+    value = jnp.asarray(value, dtype=state.dtype)
     # We get the tree index of the node.
     mapped_index = get_tree_index(state.tree_depth, node_index)
     # We ensure that if we index out of bounds (which is what we do for padding)
@@ -330,6 +332,8 @@ def set_batch_bincount(
     Returns:
         A buffer state with updates nodes.
     """
+    # Cast the values to the correct dtype.
+    values = jnp.asarray(values, dtype=state.dtype)
     # We get the tree indices of the nodes.
     mapped_indices = get_tree_index(state.tree_depth, node_indices)
 
@@ -408,6 +412,8 @@ def set_batch_scan(
     Returns:
         A buffer state with updates nodes.
     """
+    # Cast the values to the correct dtype.
+    values = jnp.asarray(values, dtype=state.dtype)
 
     def update_node_priority(state: SumTreeState, node_data: Tuple[Array, Array]):
         """Updates the priority of a single node."""
