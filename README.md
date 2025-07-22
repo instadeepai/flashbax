@@ -200,6 +200,9 @@ It is important to include `donate_argnums` when calling `jax.jit` to enable JAX
 ### Storing Data with Vault
 As mentioned above, Vault stores experience data to disk by extending the temporal axis of a Flashbax buffer state. By default, Vault conveniently handles the bookkeeping of this process: consuming a buffer state and saving any fresh, previously unseen data. e.g. Suppose we write 10 timesteps to our Flashbax buffer, and then save this state to a Vault; since all of this data is fresh, all of it will be written to disk. However, if we then write one more timestep and save the state to the Vault, only that new timestep will be written, preventing any duplication of data that has already been saved. Importantly, one must remember that Flashbax states are implemented as _ring buffers_, meaning the Vault must be updated sufficiently frequently before unseen data in the Flashbax buffer state is overwritten. i.e. If our buffer state has a time-axis length of $\tau$, then we must save to the vault every $\tau - 1$ steps, lest we overwrite (and lose) unsaved data.
 
+### X64 Precision
+There can be issues when using 32-bit precision and using the sum tree or prioritised experience replay buffer. Due to numerical instabilities, you stand the chance of sampling priority=zero transitions. To fix this, you can use 64-bit precision or simply mask out zero probability transitions when using them for RL losses or importance sampling weights. Otherwise, you can make a wrapper of the prioritised replay buffer's sample function that simply replaces zero probability transitions with another random (or high probability) transition in the batch. We did not want to impose this replacement functionality on the user.
+
 In summary, understanding and addressing these considerations will help you navigate potential pitfalls and ensure the effectiveness of your reinforcement learning strategies while utilising Flashbax buffers.
 
 ## Benchmarks 📈
