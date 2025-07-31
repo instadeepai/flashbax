@@ -101,10 +101,10 @@ def test_mixed_trajectory_sample(
         buffers.append(buffer)
 
         state = buffer.init(
-            jax.tree_map(lambda x, _i=i: jnp.ones_like(x) * _i, fake_transition)
+            jax.tree.map(lambda x, _i=i: jnp.ones_like(x) * _i, fake_transition)
         )
         fake_add_data = get_fake_batch_sequence(fake_transition, add_batch_size, 50)
-        fake_add_data = jax.tree_map(
+        fake_add_data = jax.tree.map(
             lambda x, _i=i: jnp.ones_like(x) * _i, fake_add_data
         )
         state = buffer.add(state, fake_add_data)
@@ -152,10 +152,10 @@ def test_mixed_prioritised_trajectory_sample(
         buffers.append(buffer)
 
         state = buffer.init(
-            jax.tree_map(lambda x, _i=i: jnp.ones_like(x) * _i, fake_transition)
+            jax.tree.map(lambda x, _i=i: jnp.ones_like(x) * _i, fake_transition)
         )
         fake_add_data = get_fake_batch_sequence(fake_transition, add_batch_size, 50)
-        fake_add_data = jax.tree_map(
+        fake_add_data = jax.tree.map(
             lambda x, _i=i: jnp.ones_like(x) * _i, fake_add_data
         )
         state = buffer.add(state, fake_add_data)
@@ -200,10 +200,10 @@ def test_mixed_flat_buffer_sample(
         buffers.append(buffer)
 
         state = buffer.init(
-            jax.tree_map(lambda x, _i=i: jnp.ones_like(x) * _i, fake_transition)
+            jax.tree.map(lambda x, _i=i: jnp.ones_like(x) * _i, fake_transition)
         )
         fake_add_data = get_fake_batch_sequence(fake_transition, add_batch_size, 50)
-        fake_add_data = jax.tree_map(
+        fake_add_data = jax.tree.map(
             lambda x, _i=i: jnp.ones_like(x) * _i, fake_add_data
         )
         state = buffer.add(state, fake_add_data)
@@ -250,10 +250,10 @@ def test_mixed_buffer_does_not_smoke(
         buffers.append(buffer)
 
         state = buffer.init(
-            jax.tree_map(lambda x, _i=i: jnp.ones_like(x) * _i, fake_transition)
+            jax.tree.map(lambda x, _i=i: jnp.ones_like(x) * _i, fake_transition)
         )
         fake_add_data = get_fake_batch_sequence(fake_transition, add_batch_size, 50)
-        fake_add_data = jax.tree_map(
+        fake_add_data = jax.tree.map(
             lambda x, _i=i: jnp.ones_like(x) * _i, fake_add_data
         )
         state = buffer.add(state, fake_add_data)
