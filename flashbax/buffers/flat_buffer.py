@@ -75,12 +75,12 @@ def validate_flat_buffer_args(
     validate_max_length_add_batch_size(max_length, add_batch_size)
 
 
-def create_flat_buffer(
+def make_flat_buffer(
     max_length: int,
     min_length: int,
     sample_batch_size: int,
-    add_sequences: bool,
-    add_batch_size: Optional[int],
+    add_sequences: bool = False,
+    add_batch_size: Optional[int] = None,
 ) -> TrajectoryBuffer:
     """Creates a trajectory buffer that acts as a flat buffer.
 
@@ -143,35 +143,3 @@ def create_flat_buffer(
         return TransitionSample(experience=ExperiencePair(first=first, second=second))
 
     return buffer.replace(add=add_fn, sample=sample_fn)  # type: ignore
-
-
-def make_flat_buffer(
-    max_length: int,
-    min_length: int,
-    sample_batch_size: int,
-    add_sequences: bool = False,
-    add_batch_size: Optional[int] = None,
-) -> TrajectoryBuffer:
-    """Makes a trajectory buffer act as a flat buffer.
-
-    Args:
-        max_length (int): The maximum length of the buffer.
-        min_length (int): The minimum length of the buffer.
-        sample_batch_size (int): The batch size of the samples.
-        add_sequences (Optional[bool], optional): Whether data is being added in sequences
-            to the buffer. If False, single transitions are being added each time add
-            is called. Defaults to False.
-        add_batch_size (Optional[int], optional): If adding data in batches, what is the
-            batch size that is being added each time. If None, single transitions or single
-            sequences are being added each time add is called. Defaults to None.
-
-    Returns:
-        The buffer."""
-
-    return create_flat_buffer(
-        max_length=max_length,
-        min_length=min_length,
-        sample_batch_size=sample_batch_size,
-        add_sequences=add_sequences,
-        add_batch_size=add_batch_size,
-    )
