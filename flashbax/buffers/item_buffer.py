@@ -47,12 +47,12 @@ def validate_item_buffer_args(
     validate_min_length(min_length, max_length)
 
 
-def create_item_buffer(
+def make_item_buffer(
     max_length: int,
     min_length: int,
     sample_batch_size: int,
-    add_sequences: bool,
-    add_batches: bool,
+    add_sequences: bool = False,
+    add_batches: bool = False,
 ) -> TrajectoryBuffer:
     """Creates a trajectory buffer that acts as an independent item buffer.
 
@@ -115,35 +115,3 @@ def create_item_buffer(
         return TrajectoryBufferSample(experience=sampled_batch)
 
     return buffer.replace(add=add_fn, sample=sample_fn)  # type: ignore
-
-
-def make_item_buffer(
-    max_length: int,
-    min_length: int,
-    sample_batch_size: int,
-    add_sequences: bool = False,
-    add_batches: bool = False,
-) -> TrajectoryBuffer:
-    """Makes a trajectory buffer act as a independent item buffer.
-
-    Args:
-        max_length (int): The maximum length of the buffer.
-        min_length (int): The minimum length of the buffer.
-        sample_batch_size (int): The batch size of the samples.
-        add_sequences (Optional[bool], optional): Whether data is being added in sequences
-            to the buffer. If False, single items are being added each time add
-            is called. Defaults to False.
-        add_batches: (Optional[bool], optional): Whether adding data in batches to the buffer.
-            If False, single transitions or single sequences are being added each time add
-            is called. Defaults to False.
-
-    Returns:
-        The buffer."""
-
-    return create_item_buffer(
-        max_length=max_length,
-        min_length=min_length,
-        sample_batch_size=sample_batch_size,
-        add_sequences=add_sequences,
-        add_batches=add_batches,
-    )
