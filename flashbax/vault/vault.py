@@ -359,7 +359,13 @@ class Vault:
 
         # By default, we read from `last received` to `current index`
         if source_interval == (0, 0):
-            source_interval = (self._last_received_fbx_index, fbx_current_index)
+            # Special case: if buffer is full and current_index is 0, and this is the first write
+            # (last_received_fbx_index is 0), we need to write the entire buffer
+            if fbx_state.is_full and fbx_current_index == 0 and self._last_received_fbx_index == 0:
+                fbx_max_index = get_tree_shape_prefix(fbx_state.experience, n_axes=2)[1]
+                source_interval = (0, fbx_max_index)
+            else:
+                source_interval = (self._last_received_fbx_index, fbx_current_index)
 
         # By default, we continue writing from the current vault index
         dest_start = self.vault_index if dest_start is None else dest_start
