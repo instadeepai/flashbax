@@ -361,7 +361,11 @@ class Vault:
         if source_interval == (0, 0):
             # Special case: if buffer is full and current_index is 0, and this is the first write
             # (last_received_fbx_index is 0), we need to write the entire buffer
-            if fbx_state.is_full and fbx_current_index == 0 and self._last_received_fbx_index == 0:
+            if (
+                fbx_state.is_full
+                and fbx_current_index == 0
+                and self._last_received_fbx_index == 0
+            ):
                 fbx_max_index = get_tree_shape_prefix(fbx_state.experience, n_axes=2)[1]
                 source_interval = (0, fbx_max_index)
             else:
