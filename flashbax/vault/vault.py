@@ -18,6 +18,7 @@ import os
 from ast import literal_eval as make_tuple
 from datetime import datetime
 from typing import Optional, Tuple, Union
+import warnings
 
 import jax
 import jax.numpy as jnp
@@ -366,8 +367,13 @@ class Vault:
                 and fbx_current_index == 0
                 and self._last_received_fbx_index == 0
             ):
-                fbx_max_index = get_tree_shape_prefix(fbx_state.experience, n_axes=2)[1]
-                source_interval = (0, fbx_max_index)
+                warnings.warn(
+                    "Writing nothing: buffer is full and current_index is 0 and first write "
+                    "(last_received_fbx_index=0). If you want to write the entire buffer, "
+                    "you should specify source_interval explicitly.",
+                    UserWarning,
+                    stacklevel=2,
+                )
             else:
                 source_interval = (self._last_received_fbx_index, fbx_current_index)
 

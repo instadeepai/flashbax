@@ -92,3 +92,15 @@ def get_timestep_count(buffer_state: chex.ArrayTree) -> int:
     )
     timestep_count: int = b_size * t_size
     return timestep_count
+
+
+def get_max_index(buffer_state: chex.ArrayTree) -> int:
+    """Utility to compute the maximum index of the buffer state.
+
+    Args:
+        buffer_state (BufferStateTypes): the buffer state to compute the maximum index for.
+
+    Returns:
+        int: the maximum index of the buffer state.
+    """
+    return get_tree_shape_prefix(buffer_state.experience, n_axes=2)[1]
