@@ -368,9 +368,10 @@ class Vault:
                 and self._last_received_fbx_index == 0
             ):
                 warnings.warn(
-                    "Writing nothing: buffer is full and current_index is 0 and first write "
-                    "(last_received_fbx_index=0). If you want to write the entire buffer, "
-                    "you should specify source_interval explicitly.",
+                    "Writing nothing: Buffer is full and current_index has reset to 0, but this is the first write "
+                    "to vault (last_received_fbx_index=0). No data will be written. To write the "
+                    "entire buffer, specify source_interval explicitly: "
+                    "v.write(buffer_state, source_interval=(0, get_max_index(buffer_state)))",
                     UserWarning,
                     stacklevel=2,
                 )
