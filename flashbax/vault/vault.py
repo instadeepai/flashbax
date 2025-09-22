@@ -15,6 +15,7 @@
 import asyncio
 import json
 import os
+import warnings
 from ast import literal_eval as make_tuple
 from datetime import datetime
 from typing import Optional, Tuple, Union
@@ -359,7 +360,23 @@ class Vault:
 
         # By default, we read from `last received` to `current index`
         if source_interval == (0, 0):
-            source_interval = (self._last_received_fbx_index, fbx_current_index)
+            # Special case: if buffer is full and current_index is 0, and this is the first write
+            # (last_received_fbx_index is 0), we need to write the entire buffer
+            if (
+                fbx_state.is_full
+                and fbx_current_index == 0
+                and self._last_received_fbx_index == 0
+            ):
+                warnings.warn(
+                    "Writing nothing: Buffer is full and current_index has reset to 0, but this "
+                    "is the first write to vault (last_received_fbx_index=0). No data will be "
+                    "written. To write the entire buffer, specify source_interval explicitly: "
+                    "v.write(buffer_state, source_interval=(0, get_max_index(buffer_state)))",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            else:
+                source_interval = (self._last_received_fbx_index, fbx_current_index)
 
         # By default, we continue writing from the current vault index
         dest_start = self.vault_index if dest_start is None else dest_start
