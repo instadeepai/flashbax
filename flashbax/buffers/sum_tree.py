@@ -12,28 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Optional, Tuple, Union
-
-if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
-    from dataclasses import dataclass
-else:
-    from flax.struct import dataclass
+from typing import Optional, Tuple, Union
 
 import chex
 import jax
 import jax.numpy as jnp
 import numpy as np
-from flax import struct
 from jax import Array
+
+from flashbax.dataclass import dataclass, field
 
 
 @dataclass
 class SumTreeState:
     nodes: Array
     max_recorded_priority: Array
-    tree_depth: int = struct.field(pytree_node=False)
-    capacity: int = struct.field(pytree_node=False)
-    dtype: jnp.dtype = struct.field(pytree_node=False)
+    tree_depth: int = field(pytree_node=False)
+    capacity: int = field(pytree_node=False)
+    dtype: jnp.dtype = field(pytree_node=False)
 
 
 def get_tree_depth(capacity: int) -> int:

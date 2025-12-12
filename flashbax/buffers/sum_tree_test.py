@@ -255,8 +255,9 @@ def test_set_batch_scan_matches_set_batch_bincount(
     values1 = jax.random.permutation(rng_key1, values)
     values2 = jax.random.permutation(rng_key2, values)
 
-    assert jnp.all(indexes1 != indexes2)
-    assert jnp.all(values1 != values2)
+    # We only need the shuffles to differ somewhere to validate ordering invariance.
+    assert jnp.any(indexes1 != indexes2)
+    assert jnp.any(values1 != values2)
 
     state_bincount = init_state  # Re-init the state.
 

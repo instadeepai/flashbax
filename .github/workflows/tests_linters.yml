@@ -4,10 +4,10 @@ on: [ push, pull_request ]
 
 jobs:
   tests-and-linters:
-    name: "Python 3.9 on GitHub Hosted runner"
+    name: "Python 3.10 on GitHub Hosted runner"
     runs-on: ubuntu-latest
     container:
-        image: python:3.9
+        image: python:3.10
 
     steps:
       - name: Install dependencies for viewer test

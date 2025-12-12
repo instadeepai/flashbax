@@ -40,7 +40,6 @@ classifiers=[
     ]
 keywords=["reinforcement-learning", "python", "jax", "memory"]
 dependencies = [
-    'flax>=0.6.11',
     'chex>=0.1.8',
     'jax>=0.4.25',
     'jaxlib>=0.4.20',
@@ -66,7 +65,10 @@ dev = [
     'pre-commit>=2.20.0',
     'pytest>=7.4.2',
     'pytest-cov>=4.00',
-    'pytest-xdist>=3.0.2'
+    'pytest-xdist>=3.0.2',
+    'orbax-checkpoint==0.11.20',
+    'etils==1.13.0',
+    'importlib-resources==6.5.2',
     ]
 examples = [
     'distrax',
